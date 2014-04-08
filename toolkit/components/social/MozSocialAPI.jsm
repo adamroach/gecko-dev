@@ -45,9 +45,9 @@ function injectController(doc, topic, data) {
       return;
 
     // Do not attempt to load the API into about: error pages
-    if (doc.documentURIObject.scheme == "about") {
-      return;
-    }
+//    if (doc.documentURIObject.scheme == "about") {
+//      return;
+//    }
 
     let containingBrowser = window.QueryInterface(Ci.nsIInterfaceRequestor)
                                   .getInterface(Ci.nsIWebNavigation)
@@ -75,7 +75,12 @@ function injectController(doc, topic, data) {
     let providerOrigin = Services.scriptSecurityManager.isSystemPrincipal(doc.nodePrincipal) ?
       origin : doc.nodePrincipal.origin;
 
-    SocialService.getProvider(providerOrigin, function(provider) {
+    if (doc.documentURIObject.scheme == "about") {
+      // origin should be what was set on the browser attribute "origin"
+    } else {
+      origin = doc.nodePrincipal.origin;
+    }
+    SocialService.getProvider(origin, function(provider) {
       if (provider && provider.enabled) {
         attachToWindow(provider, window);
       }
@@ -201,6 +206,18 @@ function attachToWindow(provider, targetWindow) {
       }
     }
   };
+
+  let addLoopPrivs = true;
+  if (addLoopPrivs) {
+    mozSocialObj.getCharPref = {
+      enumerable: true,
+      configurable: true,
+      writable: true,
+      value: function(prefName) {
+        return Services.prefs.getCharPref(prefName);
+      }
+    };
+  }
 
   let contentObj = Cu.createObjectIn(targetWindow);
   Object.defineProperties(contentObj, mozSocialObj);

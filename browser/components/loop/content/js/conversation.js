@@ -4,16 +4,14 @@
 
 /* global loop:true */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
-
 var loop = loop || {};
-loop.conversation = (function(TB, mozL10n) {
+loop.conversation = (function(OT, webL10n) {
   "use strict";
 
   var sharedViews = loop.shared.views,
-      baseServerUrl = Services.prefs.getCharPref("loop.server"),
+      baseServerUrl = navigator.mozSocial.getCharPref("loop.server"),
       // aliasing translation function as __ for concision
-      __ = mozL10n.get;
+      __ = webL10n.get;
 
   /**
    * App router.
@@ -140,7 +138,7 @@ loop.conversation = (function(TB, mozL10n) {
 
       this.loadView(
         new loop.shared.views.ConversationView({
-          sdk: TB,
+          sdk: OT,
           model: this._conversation
       }));
     },
@@ -170,4 +168,4 @@ loop.conversation = (function(TB, mozL10n) {
     ConversationRouter: ConversationRouter,
     init: init
   };
-})(window.TB, document.mozL10n);
+})(window.OT, document.webL10n);

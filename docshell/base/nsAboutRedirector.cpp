@@ -72,6 +72,14 @@ static RedirEntry kRedirMap[] = {
     // because the security manager would disallow srcdoc iframes otherwise.
     { "srcdoc", "about:blank",
       nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+      nsIAboutModule::HIDE_FROM_ABOUTABOUT },
+    { "loopconversation", "chrome://browser/content/loop/conversation.html",
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+      nsIAboutModule::ALLOW_SCRIPT |
+      nsIAboutModule::HIDE_FROM_ABOUTABOUT },
+    { "looppanel", "chrome://browser/content/loop/panel.html",
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+      nsIAboutModule::ALLOW_SCRIPT |
       nsIAboutModule::HIDE_FROM_ABOUTABOUT }
 };
 static const int kRedirTotal = mozilla::ArrayLength(kRedirMap);
@@ -93,7 +101,7 @@ nsAboutRedirector::NewChannel(nsIURI *aURI, nsIChannel **result)
     if (NS_FAILED(rv))
         return rv;
 
-    for (int i=0; i<kRedirTotal; i++) 
+    for (int i=0; i<kRedirTotal; i++)
     {
         if (!strcmp(path.get(), kRedirMap[i].id))
         {
@@ -123,7 +131,7 @@ nsAboutRedirector::GetURIFlags(nsIURI *aURI, uint32_t *result)
     nsresult rv = NS_GetAboutModuleName(aURI, name);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    for (int i=0; i < kRedirTotal; i++) 
+    for (int i=0; i < kRedirTotal; i++)
     {
         if (name.EqualsASCII(kRedirMap[i].id))
         {

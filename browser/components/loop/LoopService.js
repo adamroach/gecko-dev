@@ -89,7 +89,7 @@ LoopService.prototype = {
 
   openChat: function(version, provider) {
     let mostRecent = Services.wm.getMostRecentWindow("navigator:browser");
-    openChatWindow(mostRecent, provider, "chrome://browser/content/loop/conversation.html#start/" + version);
+    openChatWindow(mostRecent, provider, "about:loopconversation#start/" + version);
   }
 };
 

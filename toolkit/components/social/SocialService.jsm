@@ -929,6 +929,8 @@ SocialProvider.prototype = {
   isSameOrigin: function isSameOrigin(uri, allowIfInheritsPrincipal) {
     if (!uri)
       return false;
+    if (this.principal.URI.schemeIs("chrome"))
+      return true;
     if (typeof uri == "string") {
       try {
         uri = Services.io.newURI(uri, null, null);
