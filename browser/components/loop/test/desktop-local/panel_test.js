@@ -19,6 +19,9 @@ describe("loop.panel", function() {
     fakeXHR.xhr.onCreate = function (xhr) {
       requests.push(xhr);
     };
+    window.navigator.mozSocial = {
+      getCharPref: sandbox.stub().returns("http://example.com")
+    };
   });
 
   afterEach(function() {

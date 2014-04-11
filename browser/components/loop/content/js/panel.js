@@ -8,8 +8,7 @@ var loop = loop || {};
 loop.panel = (function(webL10n) {
   "use strict";
 
-  var baseServerUrl = navigator.mozSocial.getCharPref("loop.server"),
-      panelView,
+  var panelView,
       // aliasing translation function as __ for concision
       __ = webL10n.get;
 
@@ -29,7 +28,7 @@ loop.panel = (function(webL10n) {
 
     initialize: function() {
       this.client = new loop.shared.Client({
-        baseServerUrl: baseServerUrl
+        baseServerUrl: window.navigator.mozSocial.getCharPref("loop.server")
       });
       this.notifier = new loop.shared.views.NotificationListView({
         el: this.$(".messages")
@@ -89,4 +88,4 @@ loop.panel = (function(webL10n) {
     init: init,
     PanelView: PanelView
   };
-})(document.webL10n);
+})(document.mozL10n || document.webL10n);

@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* global loop, sinon */
+/*global loop, sinon, chai, beforeEach, describe, afterEach, it  */
 
 var expect = chai.expect;
 
@@ -19,6 +19,9 @@ describe("loop.conversation", function() {
       notify: sandbox.spy(),
       warn: sandbox.spy(),
       error: sandbox.spy()
+    };
+    window.navigator.mozSocial = {
+      getCharPref: sandbox.stub().returns("http://example.com")
     };
   });
 

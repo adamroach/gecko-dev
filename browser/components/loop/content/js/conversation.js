@@ -9,7 +9,6 @@ loop.conversation = (function(OT, webL10n) {
   "use strict";
 
   var sharedViews = loop.shared.views,
-      baseServerUrl = navigator.mozSocial.getCharPref("loop.server"),
       // aliasing translation function as __ for concision
       __ = webL10n.get;
 
@@ -119,7 +118,7 @@ loop.conversation = (function(OT, webL10n) {
       // will implement the follow-ups.
       this._conversation.set({loopVersion: loopVersion});
       this._conversation.initiate({
-        baseServerUrl: baseServerUrl,
+        baseServerUrl: window.navigator.mozSocial.getCharPref("loop.server"),
         outgoing: false
       });
     },
@@ -168,4 +167,4 @@ loop.conversation = (function(OT, webL10n) {
     ConversationRouter: ConversationRouter,
     init: init
   };
-})(window.OT, document.webL10n);
+})(window.OT, document.mozL10n || document.webL10n);
