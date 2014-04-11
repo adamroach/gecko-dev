@@ -72,14 +72,6 @@ static RedirEntry kRedirMap[] = {
     // because the security manager would disallow srcdoc iframes otherwise.
     { "srcdoc", "about:blank",
       nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
-      nsIAboutModule::HIDE_FROM_ABOUTABOUT },
-    { "loopconversation", "chrome://browser/content/loop/conversation.html",
-      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
-      nsIAboutModule::ALLOW_SCRIPT |
-      nsIAboutModule::HIDE_FROM_ABOUTABOUT },
-    { "looppanel", "chrome://browser/content/loop/panel.html",
-      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
-      nsIAboutModule::ALLOW_SCRIPT |
       nsIAboutModule::HIDE_FROM_ABOUTABOUT }
 };
 static const int kRedirTotal = mozilla::ArrayLength(kRedirMap);
