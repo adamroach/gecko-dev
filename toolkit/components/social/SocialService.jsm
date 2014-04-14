@@ -584,10 +584,6 @@ this.SocialService = {
   },
 
   installProvider: function(aDOMDocument, data, installCallback) {
-    // Don't allow installation for e.g. chrome URIs.
-    if (Services.scriptSecurityManager.isSystemPrincipal(aDOMDocument.nodePrincipal))
-      throw new Error("SocialService.installProvider: system principals are not allowed.");
-
     let manifest;
     let installOrigin = aDOMDocument.nodePrincipal.origin;
 

@@ -44,11 +44,6 @@ function injectController(doc, topic, data) {
     if (!window || PrivateBrowsingUtils.isWindowPrivate(window))
       return;
 
-    // Do not attempt to load the API into about: error pages
-//    if (doc.documentURIObject.scheme == "about") {
-//      return;
-//    }
-
     let containingBrowser = window.QueryInterface(Ci.nsIInterfaceRequestor)
                                   .getInterface(Ci.nsIWebNavigation)
                                   .QueryInterface(Ci.nsIDocShell)
@@ -66,20 +61,22 @@ function injectController(doc, topic, data) {
       return;
     }
 
+    // Only handle about:loop* paths, do not load into any other about:* pages.
+    if (doc.documentURIObject.scheme == "about") {
+      if (!doc.documentURIObject.path.startsWith("loop")) {
+        return;
+      }
+      // origin should be what was set on the browser attribute "origin"
+    } else {
+      origin = doc.nodePrincipal.origin;
+    }
+
     // we always handle window.close on social content, even if they are not
     // "enabled".  "enabled" is about the worker state and a provider may
     // still be in e.g. the share panel without having their worker enabled.
     handleWindowClose(window);
 
-    // If we're a system principle, we don't have the origin, so use the one obtained above.
-    let providerOrigin = Services.scriptSecurityManager.isSystemPrincipal(doc.nodePrincipal) ?
-      origin : doc.nodePrincipal.origin;
 
-    if (doc.documentURIObject.scheme == "about") {
-      // origin should be what was set on the browser attribute "origin"
-    } else {
-      origin = doc.nodePrincipal.origin;
-    }
     SocialService.getProvider(origin, function(provider) {
       if (provider && provider.enabled) {
         attachToWindow(provider, window);
@@ -223,19 +220,13 @@ function attachToWindow(provider, targetWindow) {
   Object.defineProperties(contentObj, mozSocialObj);
   Cu.makeObjectPropsNormal(contentObj);
 
-  let navigatorObj = targetWindow.navigator.wrappedJSObject;
-  // If we're accessing a chrome uri, then the navigator object isn't wrapped
-  // and we need to access it raw.
-  if (!navigatorObj)
-    navigatorObj = targetWindow.navigator;
-
-  navigatorObj.__defineGetter__("mozSocial", function() {
+  targetWindow.navigator.wrappedJSObject.__defineGetter__("mozSocial", function() {
     // We do this in a getter, so that we create these objects
     // only on demand (this is a potential concern, since
     // otherwise we might add one per iframe, and keep them
     // alive for as long as the window is alive).
-    delete navigatorObj.mozSocial;
-    return navigatorObj.mozSocial = contentObj;
+    delete targetWindow.navigator.wrappedJSObject.mozSocial;
+    return targetWindow.navigator.wrappedJSObject.mozSocial = contentObj;
   });
 
   if (port) {
