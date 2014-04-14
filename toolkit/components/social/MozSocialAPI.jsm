@@ -76,7 +76,6 @@ function injectController(doc, topic, data) {
     // still be in e.g. the share panel without having their worker enabled.
     handleWindowClose(window);
 
-
     SocialService.getProvider(origin, function(provider) {
       if (provider && provider.enabled) {
         attachToWindow(provider, window);
@@ -211,6 +210,10 @@ function attachToWindow(provider, targetWindow) {
       configurable: true,
       writable: true,
       value: function(prefName) {
+        if (!prefName.startsWith("loop.")) {
+          throw new Error("Expected the preference name to start with 'loop.'");
+        }
+
         return Services.prefs.getCharPref(prefName);
       }
     };
