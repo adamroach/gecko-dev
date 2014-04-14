@@ -93,7 +93,7 @@ nsAboutRedirector::NewChannel(nsIURI *aURI, nsIChannel **result)
     if (NS_FAILED(rv))
         return rv;
 
-    for (int i=0; i<kRedirTotal; i++)
+    for (int i=0; i<kRedirTotal; i++) 
     {
         if (!strcmp(path.get(), kRedirMap[i].id))
         {
@@ -123,7 +123,7 @@ nsAboutRedirector::GetURIFlags(nsIURI *aURI, uint32_t *result)
     nsresult rv = NS_GetAboutModuleName(aURI, name);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    for (int i=0; i < kRedirTotal; i++)
+    for (int i=0; i < kRedirTotal; i++) 
     {
         if (name.EqualsASCII(kRedirMap[i].id))
         {

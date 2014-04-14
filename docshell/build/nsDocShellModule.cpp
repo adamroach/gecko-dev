@@ -23,7 +23,7 @@
 #include "nsLocalHandlerApp.h"
 #ifdef MOZ_ENABLE_DBUS
 #include "nsDBusHandlerApp.h"
-#endif
+#endif 
 #if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_ENABLE_MEEGOTOUCHSHARE)
 #include "nsExternalSharingAppService.h"
 #endif
@@ -84,7 +84,7 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsOfflineCacheUpdate)
 NS_GENERIC_FACTORY_CONSTRUCTOR(PlatformLocalHandlerApp_t)
 #ifdef MOZ_ENABLE_DBUS
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsDBusHandlerApp)
-#endif
+#endif 
 #if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_ENABLE_MEEGOTOUCHSHARE)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsExternalSharingAppService)
 #endif
