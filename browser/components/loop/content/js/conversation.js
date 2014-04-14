@@ -167,4 +167,4 @@ loop.conversation = (function(OT, webL10n) {
     ConversationRouter: ConversationRouter,
     init: init
   };
-})(window.OT, document.mozL10n || document.webL10n);
+})(window.OT, document.mozL10n);

@@ -217,6 +217,30 @@ function attachToWindow(provider, targetWindow) {
         return Services.prefs.getCharPref(prefName);
       }
     };
+    mozSocialObj.getLocale = {
+      enumerable: true,
+      configurable: true,
+      writable: true,
+      value: function(prefName) {
+        try {
+          return Services.prefs.getComplexValue("general.useragent.locale",
+            Ci.nsISupportsString).data;
+        } catch (ex) {
+          return "en-US";
+        }
+      }
+    };
+    mozSocialObj.getStrings = {
+      enumerable: true,
+      configurable: true,
+      writable: true,
+      value: function(key) {
+        var loopService = Cc["@mozilla.org/browser/loopservice;1"].
+          getService(Ci.ILoopService);
+
+        return loopService.getStrings(key);
+      }
+    };
   }
 
   let contentObj = Cu.createObjectIn(targetWindow);

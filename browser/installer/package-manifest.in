@@ -262,6 +262,7 @@
 @BINPATH@/components/layout_xul_tree.xpt
 @BINPATH@/components/layout_xul.xpt
 @BINPATH@/components/locale.xpt
+@BINPATH@/components/loop.xpt
 @BINPATH@/components/lwbrk.xpt
 @BINPATH@/browser/components/migration.xpt
 @BINPATH@/components/mimetype.xpt
@@ -578,6 +579,9 @@
 @BINPATH@/components/TestInterfaceJS.js
 @BINPATH@/components/TestInterfaceJS.manifest
 #endif
+
+@BINPATH@/browser/components/LoopService.js
+@BINPATH@/browser/components/loop.manifest
 
 ; Modules
 @BINPATH@/browser/modules/*

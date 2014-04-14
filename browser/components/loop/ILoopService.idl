@@ -1,0 +1,9 @@
+
+
+#include "nsISupports.idl"
+
+[scriptable, uuid(072c0699-2036-4dc7-848f-93673b078214)]
+interface ILoopService : nsISupports
+{
+  AUTF8String getStrings(in ACString key);
+};

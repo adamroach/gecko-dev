@@ -88,4 +88,4 @@ loop.panel = (function(webL10n) {
     init: init,
     PanelView: PanelView
   };
-})(document.mozL10n || document.webL10n);
+})(document.mozL10n);

@@ -10,7 +10,6 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/MozSocialAPI.jsm");
 Cu.import("resource://gre/modules/SocialService.jsm");
 
-//const loopServerUri = "http://loop.dev.mozaws.net";
 const loopServerUri = Services.prefs.getCharPref("loop.server");
 const pushServerUri = "wss://push.services.mozilla.com";
 const channelID = "8b1081ce-9b35-42b5-b8f5-3ff8cb813a50";
@@ -22,7 +21,7 @@ LoopService.prototype = {
 
   _xpcom_factory: XPCOMUtils.generateSingletonFactory(LoopService),
 
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver, Ci.nsITimerCallback]),
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver, Ci.nsITimerCallback, Ci.ILoopService]),
 
   observe: function LS_observe(aSubject, aTopic, aData) {
     if (aTopic != "profile-after-change") {
@@ -90,6 +89,40 @@ LoopService.prototype = {
   openChat: function(version, provider) {
     let mostRecent = Services.wm.getMostRecentWindow("navigator:browser");
     openChatWindow(mostRecent, provider, "about:loopconversation#start/" + version);
+  },
+
+  getStrings: function(key) {
+    try {
+      if (!this._localizedStrings) {
+        this.initLocalisedStrings();
+      }
+      return JSON.stringify(this._localizedStrings[key] || null);
+    } catch (e) {
+      Cu.reportError('Unable to retrive localized strings: ' + e);
+      return null;
+    }
+  },
+
+  initLocalisedStrings: function() {
+    var stringBundle =
+      Services.strings.createBundle('chrome://browser/locale/loop/loop.properties');
+
+    var map = {};
+    var enumerator = stringBundle.getSimpleEnumeration();
+    while (enumerator.hasMoreElements()) {
+      var string = enumerator.getNext().QueryInterface(Ci.nsIPropertyElement);
+      var key = string.key, property = 'textContent';
+      var i = key.lastIndexOf('.');
+      if (i >= 0) {
+        property = key.substring(i + 1);
+        key = key.substring(0, i);
+      }
+      if (!(key in map))
+        map[key] = {};
+      map[key][property] = string.value;
+    }
+
+    this._localizedStrings = map;
   }
 };
 

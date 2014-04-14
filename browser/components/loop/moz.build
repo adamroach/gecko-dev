@@ -10,3 +10,9 @@ EXTRA_COMPONENTS += [
     'loop.manifest',
     'LoopService.js',
 ]
+
+XPIDL_MODULE = 'loop'
+
+XPIDL_SOURCES += [
+    'ILoopService.idl'
+]
