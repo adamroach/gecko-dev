@@ -21,7 +21,9 @@ describe("loop.conversation", function() {
       error: sandbox.spy()
     };
     window.navigator.mozSocial = {
-      getCharPref: sandbox.stub().returns("http://example.com")
+      getCharPref: sandbox.stub().returns("http://example.com"),
+      getLocale: sandbox.stub().returns("en-US"),
+      getStrings: sandbox.stub().returns("{}")
     };
   });
 
