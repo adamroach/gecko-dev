@@ -132,6 +132,8 @@ private:
     CreateCodebasePrincipal(nsIURI* aURI, uint32_t aAppId, bool aInMozBrowser,
                             nsIPrincipal** result);
 
+    nsresult GetSimpleOverridePrincipal(nsIURI *aURI, nsIPrincipal **aPrincipal);
+
     // Returns null if a principal cannot be found.  Note that rv can be NS_OK
     // when this happens -- this means that there was no script for the
     // context.  Callers MUST pass in a non-null rv here.

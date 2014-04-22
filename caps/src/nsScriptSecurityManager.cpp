@@ -279,6 +279,63 @@ nsScriptSecurityManager::SecurityHashURI(nsIURI* aURI)
     return NS_SecurityHashURI(aURI);
 }
 
+struct OverrideEntry {
+    const char *uriToOverride;
+    const char *uriForPrincipal;
+};
+
+// linearly searched for now; if this grows much, we'll likely want to
+// switch to binary search or even a hashtable
+//
+// XXX loop.dev.mozaws.net hardcoded for now; we really want to get this from the
+// loop.server pref
+static OverrideEntry kOverrideMap[] = {
+    { "about:looppanel", "https://loop.dev.mozaws.net" },
+    { "about:loopconversation", "https://loop.dev.mozaws.net" }
+};
+
+nsresult
+nsScriptSecurityManager::GetSimpleOverridePrincipal(nsIURI *aURI,
+                                                    nsIPrincipal **aPrincipal) {
+    // XXX audit all NS_ENSURE_* for cleanups
+    
+    nsresult rv;
+    
+    uint32_t i;
+    for (i = 0; i < sizeof kOverrideMap; i++) {
+        nsCOMPtr<nsIURI> uriToOverride, uriForPrincipal;
+        
+        rv = sIOService->NewURI(nsDependentCString(kOverrideMap[i].uriToOverride),
+                                nullptr, nullptr,
+                                getter_AddRefs(uriToOverride));
+        NS_ENSURE_SUCCESS(rv, rv);
+
+        bool urisAreEqual;
+        rv = uriToOverride->Equals(aURI, &urisAreEqual);
+        NS_ENSURE_SUCCESS(rv, rv);
+        
+        if (urisAreEqual) {
+            rv = sIOService->NewURI(nsDependentCString(kOverrideMap[i].uriForPrincipal),
+                                    nullptr, nullptr, getter_AddRefs(uriForPrincipal));
+            NS_ENSURE_SUCCESS(rv, rv);
+            
+            
+            nsCOMPtr<nsIPrincipal> overridePrincipal;
+            rv = GetSimpleCodebasePrincipal(uriForPrincipal,
+                                            getter_AddRefs(overridePrincipal));
+            NS_ENSURE_SUCCESS(rv, rv);
+            
+            NS_IF_ADDREF(*aPrincipal = overridePrincipal);
+            return NS_OK;
+        }
+    }
+    
+    *aPrincipal = nullptr;
+    return NS_OK;
+}
+
+#include "../../../netwerk/base/src/nsSimpleURI.h"
+
 NS_IMETHODIMP
 nsScriptSecurityManager::GetChannelPrincipal(nsIChannel* aChannel,
                                              nsIPrincipal** aPrincipal)
@@ -296,8 +353,30 @@ nsScriptSecurityManager::GetChannelPrincipal(nsIChannel* aChannel,
     // OK, get the principal from the URI.  Make sure this does the same thing
     // as nsDocument::Reset and XULDocument::StartDocumentLoad.
     nsCOMPtr<nsIURI> uri;
-    nsresult rv = NS_GetFinalChannelURI(aChannel, getter_AddRefs(uri));
+    nsAutoCString uriSpec;
+
+
+    nsresult rv = aChannel->GetURI(getter_AddRefs(uri));
     NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = static_cast<nsSimpleURI *>(uri.get())->GetAsciiSpec(uriSpec);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    fprintf(stderr, "channel uri: %s\n", uriSpec.get());
+    uriSpec = "";
+
+    rv = NS_GetFinalChannelURI(aChannel, getter_AddRefs(uri));
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = static_cast<nsSimpleURI *>(uri.get())->GetAsciiSpec(uriSpec);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    fprintf(stderr, "final uri: %s\n", uriSpec.get());
+
+    if (NS_SUCCEEDED(GetSimpleOverridePrincipal(uri.get(), aPrincipal)) && aPrincipal)
+    {
+        return NS_OK;
+    }
 
     nsCOMPtr<nsIDocShell> docShell;
     NS_QueryNotificationCallbacks(aChannel, docShell);
