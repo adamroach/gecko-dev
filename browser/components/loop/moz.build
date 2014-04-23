@@ -11,6 +11,12 @@ EXTRA_COMPONENTS += [
     'LoopService.js',
 ]
 
+JS_MODULES_PATH = 'modules/loop'
+
+EXTRA_JS_MODULES += [
+    'MozLoopAPI.jsm',
+]
+
 XPIDL_MODULE = 'loop'
 
 XPIDL_SOURCES += [

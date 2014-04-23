@@ -261,6 +261,18 @@
            noautofocus="true"
            position="topcenter topright"/>
 
+#ifdef MOZ_LOOP
+    <panel id="loop-panel"
+           class="loop-panel"
+           type="arrow"
+           orient="horizontal"
+           hidden="true">
+      <iframe id="loop-panel-frame"
+              type="content"
+      />
+    </panel>
+#endif
+
     <menupopup id="toolbar-context-menu"
                onpopupshowing="onViewToolbarsPopupShowing(event, document.getElementById('viewToolbarsMenuSeparator'));">
       <menuitem oncommand="gCustomizeMode.addToPanel(document.popupNode)"
@@ -775,6 +787,20 @@
                      onpopuphiding="WebrtcIndicator.clearPopup(this);"
                      oncommand="WebrtcIndicator.menuCommand(event.target);"/>
         </toolbarbutton>
+
+#ifdef MOZ_LOOP
+        <toolbarbutton id="loop-call-button"
+                       class="toolbarbutton-1 chromeclass-toolbar-additional"
+                       persist="class"
+                       removable="true"
+                       label="LooP"
+                       tooltiptext="LooP me!"
+                       oncommand="LoopUI.openCallPanel(event);"
+                       cui-areatype="toolbar"
+                       overflows="false"
+                       >
+        </toolbarbutton>
+#endif
 
         <toolbarbutton id="bookmarks-menu-button"
                        class="toolbarbutton-1 chromeclass-toolbar-additional"
