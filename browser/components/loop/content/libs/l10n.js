@@ -10,7 +10,7 @@
 
   // fetch an l10n objects
   function getL10nData(key) {
-    var response = navigator.mozSocial.getStrings(key);
+    var response = navigator.mozLoop.getStrings(key);
     var data = JSON.parse(response);
     if (!data)
       console.warn('[l10n] #' + key + ' missing for [' + gLanguage + ']');
@@ -80,7 +80,7 @@
   }
 
   window.addEventListener('DOMContentLoaded', function() {
-    gLanguage = navigator.mozSocial.getLocale();
+    gLanguage = navigator.mozLoop.getLocale();
 
     translateFragment();
 

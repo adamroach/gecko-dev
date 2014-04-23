@@ -1,3 +1,4 @@
+// XXX - let's make this a .jsm!
 "use strict";
 
 const Cc = Components.classes;
@@ -7,8 +8,8 @@ const Cr = Components.results;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/MozSocialAPI.jsm");
-Cu.import("resource://gre/modules/SocialService.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "openChatWindow", "resource:///modules/loop/MozLoopAPI.jsm");
 
 const loopServerUri = Services.prefs.getCharPref("loop.server");
 const pushServerUri = "wss://push.services.mozilla.com";
@@ -77,18 +78,17 @@ LoopService.prototype = {
                              .createInstance(Ci.nsIXMLHttpRequest);
         break;
       case "notification":
-        msg.updates.forEach(function(update) {
+        for (let update of msg.updates) {
           if (update.channelID === channelID) {
-            SocialService.getProvider("chrome://browser/content/loop/", this.openChat.bind(this, update.version));
+            this.openChat(update.version);
           }
-        }.bind(this));
+        }
         break;
     }
   },
 
-  openChat: function(version, provider) {
-    let mostRecent = Services.wm.getMostRecentWindow("navigator:browser");
-    openChatWindow(mostRecent, provider, "about:loopconversation#start/" + version);
+  openChat: function(version) {
+    openChatWindow(null, "LooP", "about:loopconversation#start/" + version);
   },
 
   getStrings: function(key) {

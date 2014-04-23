@@ -19,7 +19,7 @@ describe("loop.panel", function() {
     fakeXHR.xhr.onCreate = function (xhr) {
       requests.push(xhr);
     };
-    window.navigator.mozSocial = {
+    window.navigator.mozLoop = {
       getCharPref: sandbox.stub().returns("http://example.com"),
       getLocale: sandbox.stub().returns("en-US"),
       getStrings: sandbox.stub().returns("{}")

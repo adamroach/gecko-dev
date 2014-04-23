@@ -28,7 +28,7 @@ loop.panel = (function(webL10n) {
 
     initialize: function() {
       this.client = new loop.shared.Client({
-        baseServerUrl: window.navigator.mozSocial.getCharPref("loop.server")
+        baseServerUrl: window.navigator.mozLoop.getCharPref("loop.server")
       });
       this.notifier = new loop.shared.views.NotificationListView({
         el: this.$(".messages")

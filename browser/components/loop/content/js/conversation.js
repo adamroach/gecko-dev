@@ -118,7 +118,7 @@ loop.conversation = (function(OT, webL10n) {
       // will implement the follow-ups.
       this._conversation.set({loopVersion: loopVersion});
       this._conversation.initiate({
-        baseServerUrl: window.navigator.mozSocial.getCharPref("loop.server"),
+        baseServerUrl: window.navigator.mozLoop.getCharPref("loop.server"),
         outgoing: false
       });
     },

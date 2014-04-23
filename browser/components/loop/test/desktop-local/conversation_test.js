@@ -20,7 +20,7 @@ describe("loop.conversation", function() {
       warn: sandbox.spy(),
       error: sandbox.spy()
     };
-    window.navigator.mozSocial = {
+    window.navigator.mozLoop = {
       getCharPref: sandbox.stub().returns("http://example.com"),
       getLocale: sandbox.stub().returns("en-US"),
       getStrings: sandbox.stub().returns("{}")
