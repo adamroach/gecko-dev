@@ -368,7 +368,7 @@ var tests = {
       ok(first.hasAttribute("activity"), "first chat should now have activity");
       ok(chatbar.nub.hasAttribute("activity"), "nub should also have activity");
       // first is collapsed, so use openChat to get it.
-      chatbar.openChat(SocialSidebar.provider, first.getAttribute("src"));
+      chatbar.openChat(SocialSidebar.provider.origin, SocialSidebar.provider.name, first.getAttribute("src"));
       ok(!first.hasAttribute("activity"), "first chat should no longer have activity");
       // The nub should lose the activity flag here too
       todo(!chatbar.nub.hasAttribute("activity"), "Bug 806266 - nub should no longer have activity");

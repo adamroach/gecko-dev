@@ -307,11 +307,11 @@ SocialChatBar = {
   get hasChats() {
     return !!this.chatbar.firstElementChild;
   },
-  openChat: function(aProvider, aURL, aCallback, aMode) {
+  openChat: function(aOrigin, aTitle, aURL, aCallback, aMode) {
     this.update();
     if (!this.isAvailable)
       return false;
-    this.chatbar.openChat(aProvider, aURL, aCallback, aMode);
+    this.chatbar.openChat(aOrigin, aTitle, aURL, aCallback, aMode);
     // We only want to focus the chat if it is as a result of user input.
     let dwu = window.QueryInterface(Ci.nsIInterfaceRequestor)
                     .getInterface(Ci.nsIDOMWindowUtils);

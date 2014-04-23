@@ -125,7 +125,7 @@ function attachToWindow(provider, targetWindow) {
       writable: true,
       value: function(toURL, callback) {
         let url = targetWindow.document.documentURIObject.resolve(toURL);
-        openChatWindow(getChromeWindow(targetWindow), provider, url, callback);
+        openChatWindow(targetWindow, provider, url, callback);
       }
     },
     openPanel: {
@@ -277,8 +277,12 @@ function isWindowGoodForChats(win) {
 }
 
 function findChromeWindowForChats(preferredWindow) {
-  if (preferredWindow && isWindowGoodForChats(preferredWindow))
-    return preferredWindow;
+  if (preferredWindow) {
+    preferredWindow = getChromeWindow(preferredWindow);
+    if (isWindowGoodForChats(preferredWindow)) {
+      return preferredWindow;
+    }
+  }
   // no good - we just use the "most recent" browser window which can host
   // chats (we used to try and "group" all chats in the same browser window,
   // but that didn't work out so well - see bug 835111
@@ -316,8 +320,8 @@ function findChromeWindowForChats(preferredWindow) {
 }
 
 this.openChatWindow =
- function openChatWindow(chromeWindow, provider, url, callback, mode) {
-  chromeWindow = findChromeWindowForChats(chromeWindow);
+ function openChatWindow(contentWindow, provider, url, callback, mode) {
+  chromeWindow = findChromeWindowForChats(contentWindow);
   if (!chromeWindow) {
     Cu.reportError("Failed to open a social chat window - no host window could be found.");
     return;
@@ -327,7 +331,9 @@ this.openChatWindow =
     Cu.reportError("Failed to open a social chat window - the requested URL is not the same origin as the provider.");
     return;
   }
-  if (!chromeWindow.SocialChatBar.openChat(provider, fullURI.spec, callback, mode)) {
+  let title = provider.name;
+  let origin = provider.origin;
+  if (!chromeWindow.SocialChatBar.openChat(origin, title, fullURI.spec, callback, mode)) {
     Cu.reportError("Failed to open a social chat window - the chatbar is not available in the target window.");
     return;
   }
