@@ -10,7 +10,6 @@ PARALLEL_DIRS += [
     'dirprovider',
     'downloads',
     'feeds',
-    'loop',
     'places',
     'preferences',
     'privatebrowsing',
@@ -21,6 +20,12 @@ PARALLEL_DIRS += [
     'tabview',
     'migration',
 ]
+
+if CONFIG['MOZ_LOOP']:
+    PARALLEL_DIRS += [
+        'loop',
+    ]
+
 
 DIRS += ['build']
 
