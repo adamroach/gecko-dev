@@ -289,26 +289,34 @@ struct OverrideEntry {
 //
 // XXX loop.dev.mozaws.net hardcoded for now; we really want to get this from the
 // loop.server pref
+//
+// XXX these should really be https URLs, but our https server isn't up yet...
 static OverrideEntry kOverrideMap[] = {
-    { "about:looppanel", "https://loop.dev.mozaws.net" },
-    { "about:loopconversation", "https://loop.dev.mozaws.net" }
+    { "about:looppanel", "http://loop.dev.mozaws.net" },
+    { "about:loopconversation", "http://loop.dev.mozaws.net" }
 };
 
 nsresult
-nsScriptSecurityManager::GetSimpleOverridePrincipal(nsIURI *aURI,
-                                                    nsIPrincipal **aPrincipal) {
+nsScriptSecurityManager::GetOverrideURI(nsIURI *aURI,
+                                        nsIURI **aURIForPrincipal) {
     // XXX audit all NS_ENSURE_* for cleanups
     
     nsresult rv;
     
     uint32_t i;
     for (i = 0; i < sizeof kOverrideMap; i++) {
+
+        // XXX these objects should be created once in ::Init, not every time
+        // through this loop
         nsCOMPtr<nsIURI> uriToOverride, uriForPrincipal;
         
         rv = sIOService->NewURI(nsDependentCString(kOverrideMap[i].uriToOverride),
                                 nullptr, nullptr,
                                 getter_AddRefs(uriToOverride));
-        NS_ENSURE_SUCCESS(rv, rv);
+        // XXX NS_ENSURE_SUCCESS(rv, rv) spews lots of errors, inexplicably.
+        // It should be put back and that should be debugged.
+        if (NS_FAILED(rv))
+            return rv;
 
         bool urisAreEqual;
         rv = uriToOverride->Equals(aURI, &urisAreEqual);
@@ -320,18 +328,13 @@ nsScriptSecurityManager::GetSimpleOverridePrincipal(nsIURI *aURI,
             NS_ENSURE_SUCCESS(rv, rv);
             
             
-            nsCOMPtr<nsIPrincipal> overridePrincipal;
-            rv = GetSimpleCodebasePrincipal(uriForPrincipal,
-                                            getter_AddRefs(overridePrincipal));
-            NS_ENSURE_SUCCESS(rv, rv);
-            
-            NS_IF_ADDREF(*aPrincipal = overridePrincipal);
+            NS_IF_ADDREF(*aURIForPrincipal = uriForPrincipal);
             return NS_OK;
         }
     }
     
-    *aPrincipal = nullptr;
-    return NS_OK;
+    *aURIForPrincipal = nullptr;
+    return NS_ERROR_FAILURE;;
 }
 
 #include "../../../netwerk/base/src/nsSimpleURI.h"
@@ -372,11 +375,6 @@ nsScriptSecurityManager::GetChannelPrincipal(nsIChannel* aChannel,
     NS_ENSURE_SUCCESS(rv, rv);
 
     fprintf(stderr, "final uri: %s\n", uriSpec.get());
-
-    if (NS_SUCCEEDED(GetSimpleOverridePrincipal(uri.get(), aPrincipal)) && aPrincipal)
-    {
-        return NS_OK;
-    }
 
     nsCOMPtr<nsIDocShell> docShell;
     NS_QueryNotificationCallbacks(aChannel, docShell);
@@ -1173,8 +1171,13 @@ nsScriptSecurityManager::GetCodebasePrincipalInternal(nsIURI *aURI,
         return CallCreateInstance(NS_NULLPRINCIPAL_CONTRACTID, result);
     }
 
+    nsCOMPtr<nsIURI> overrideURI;
+    rv = GetOverrideURI(aURI, getter_AddRefs(overrideURI));
+    // XXX ignored
+    
     nsCOMPtr<nsIPrincipal> principal;
-    rv = CreateCodebasePrincipal(aURI, aAppId, aInMozBrowser,
+    rv = CreateCodebasePrincipal(overrideURI.get() ? overrideURI.get() : aURI,
+                                 aAppId, aInMozBrowser,
                                  getter_AddRefs(principal));
     NS_ENSURE_SUCCESS(rv, rv);
     NS_IF_ADDREF(*result = principal);
