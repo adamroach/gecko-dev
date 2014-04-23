@@ -10,7 +10,7 @@
 
   // fetch an l10n objects
   function getL10nData(key) {
-    var response = "{}"; //XXX FirefoxCom.requestSync('getStrings', key);
+    var response = window.navigator.mozLoop.getStrings(key);
     var data = JSON.parse(response);
     if (!data)
       console.warn('[l10n] #' + key + ' missing for [' + gLanguage + ']');
@@ -80,7 +80,7 @@
   }
 
   window.addEventListener('DOMContentLoaded', function() {
-      gLanguage = "en-US"; // XXX FirefoxCom.requestSync('getLocale', null);
+    gLanguage = window.navigator.mozLoop.getLocale();
 
     translateFragment();
 

@@ -4,14 +4,11 @@
 
 /* global loop:true */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
-
 var loop = loop || {};
 loop.conversation = (function(OT, mozL10n) {
   "use strict";
 
   var sharedViews = loop.shared.views,
-      baseServerUrl = Services.prefs.getCharPref("loop.server"),
       // aliasing translation function as __ for concision
       __ = mozL10n.get;
 
@@ -87,7 +84,7 @@ loop.conversation = (function(OT, mozL10n) {
       // will implement the follow-ups.
       this._conversation.set({loopVersion: loopVersion});
       this._conversation.initiate({
-        baseServerUrl: baseServerUrl,
+        baseServerUrl: window.navigator.mozLoop.getCharPref("loop.server"),
         outgoing: false
       });
     },

@@ -9,5 +9,6 @@ JAR_MANIFESTS += ['jar.mn']
 JS_MODULES_PATH = 'modules/loop'
 
 EXTRA_JS_MODULES += [
+    'MozLoopAPI.jsm',
     'MozLoopService.jsm',
 ]
