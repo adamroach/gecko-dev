@@ -30,6 +30,7 @@
 
     <implementation implements="nsIDOMEventListener">
       <constructor><![CDATA[
+        // XXX - need to work out how to unify these error listeners.
         let Social = Components.utils.import("resource:///modules/Social.jsm", {}).Social;
         this.content.__defineGetter__("popupnotificationanchor",
                                       () => document.getAnonymousElementByAttribute(this, "anonid", "notification-icon"));
@@ -186,17 +187,18 @@
 
       <method name="swapWindows">
         <body><![CDATA[
-        let provider = Social._getProviderFromOrigin(this.content.getAttribute("origin"));
+        let title = this.content.getAttribute("title");
         if (this.chatbar) {
           this.chatbar.detachChatbox(this, { "centerscreen": "yes" }, win => {
-            win.document.title = provider.name;
+            win.document.title = title;
           });
         } else {
           // attach this chatbox to the topmost browser window
           let findChromeWindowForChats = Cu.import("resource://gre/modules/MozSocialAPI.jsm").findChromeWindowForChats;
           let win = findChromeWindowForChats();
           let chatbar = win.SocialChatBar.chatbar;
-          chatbar.openChat(provider, "about:blank", win => {
+          let origin = this.content.getAttribute("origin");
+          chatbar.openChat(origin, title, "about:blank", win => {
             let cb = chatbar.selectedChat;
             this.swapDocShells(cb);
 
@@ -534,7 +536,8 @@
       </method>
 
       <method name="openChat">
-        <parameter name="aProvider"/>
+        <parameter name="aOrigin"/>
+        <parameter name="aTitle"/>
         <parameter name="aURL"/>
         <parameter name="aCallback"/>
         <parameter name="aMode"/>
@@ -565,7 +568,8 @@
           cb.src = aURL;
           if (aMode == "minimized")
             cb.setAttribute("minimized", "true");
-          cb.setAttribute("origin", aProvider.origin);
+          cb.setAttribute("origin", aOrigin);
+          cb.setAttribute("title", aTitle);
           this.insertBefore(cb, this.firstChild);
           this.selectedChat = cb;
           this.chatboxForURL.set(aURL, Cu.getWeakReference(cb));
@@ -750,9 +754,9 @@
         let top = Math.min(Math.max(eY, sY.value),
                            sY.value + sHeight.value - winHeight);
 
-        let provider = Social._getProviderFromOrigin(draggedChat.content.getAttribute("origin"));
+        let title = draggedChat.content.getAttribute("title");
         this.detachChatbox(draggedChat, { screenX: left, screenY: top }, win => {
-          win.document.title = provider.name;
+          win.document.title = title;
         });
 
         event.stopPropagation();

@@ -42,7 +42,7 @@ function openPanel(url, panelCallback, loadCallback) {
 
 function openChat(url, panelCallback, loadCallback) {
   // open a chat window
-  SocialChatBar.openChat(SocialSidebar.provider, url, panelCallback);
+  SocialChatBar.openChat(SocialSidebar.provider.origin, SocialSidebar.provider.name, url, panelCallback);
   SocialChatBar.chatbar.firstChild.addEventListener("DOMContentLoaded", function panelLoad() {
     SocialChatBar.chatbar.firstChild.removeEventListener("DOMContentLoaded", panelLoad, true);
     loadCallback();
