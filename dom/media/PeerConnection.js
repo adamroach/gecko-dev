@@ -57,7 +57,7 @@ GlobalPCList.prototype = {
 
     if (this._creationWinId && this._creationWinId === winID) {
 	try {
-	  this._creationObserver.onCreation();
+	  this._creationWatcher.onCreation();
         } catch (ex) {
           // if the supplied callback throws, we want to ignore that and keep going
         }
@@ -89,10 +89,10 @@ GlobalPCList.prototype = {
   },
 
   _creationWinId: null,
-  _creationObserver: null,
+  _creationWatcher: null,
 
-  subscribeToCreationsForWindow: function(winID, observer) {
-      this._creationObserver = observer;
+  watchCreationsForWindow: function(winID, creationWatcher) {
+      this._creationWatcher = creationWatcher;
       this._creationWinId = winID;
   },
 
