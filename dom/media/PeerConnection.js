@@ -54,15 +54,6 @@ GlobalPCList.prototype = {
 
   addPC: function(pc) {
     let winID = pc._winID;
-
-    if (this._creationWinId && this._creationWinId === winID) {
-	try {
-	  this._creationObserver.onCreation();
-        } catch (ex) {
-          // if the supplied callback throws, we want to ignore that and keep going
-        }
-    }
-
     if (this._list[winID]) {
       this._list[winID].push(Cu.getWeakReference(pc));
     } else {
@@ -86,14 +77,6 @@ GlobalPCList.prototype = {
   hasActivePeerConnection: function(winID) {
     this.removeNullRefs(winID);
     return this._list[winID] ? true : false;
-  },
-
-  _creationWinId: null,
-  _creationObserver: null,
-
-  subscribeToCreationsForWindow: function(winID, observer) {
-      this._creationObserver = observer;
-      this._creationWinId = winID;
   },
 
   observe: function(subject, topic, data) {
