@@ -1085,6 +1085,7 @@ xpc::CreateSandboxObject(JSContext *cx, MutableHandleValue vp, nsISupports *prin
         compartmentOptions.setZone(JS::SystemZone);
 
     compartmentOptions.setInvisibleToDebugger(options.invisibleToDebugger)
+                      .setDiscardSource(options.discardSource)
                       .setTrace(TraceXPCGlobal);
 
     RootedObject sandbox(cx, xpc::CreateGlobalObject(cx, &SandboxClass,
@@ -1518,6 +1519,7 @@ SandboxOptions::Parse()
            ParseString("sandboxName", sandboxName) &&
            ParseObject("sameZoneAs", &sameZoneAs) &&
            ParseBoolean("invisibleToDebugger", &invisibleToDebugger) &&
+           ParseBoolean("discardSource", &discardSource) &&
            ParseGlobalProperties() &&
            ParseValue("metadata", &metadata);
 }
@@ -1541,13 +1543,13 @@ AssembleSandboxMemoryReporterName(JSContext *cx, nsCString &sandboxName)
 
     // Append the caller's location information.
     if (frame) {
-        nsCString location;
+        nsString location;
         int32_t lineNumber = 0;
         frame->GetFilename(location);
         frame->GetLineNumber(&lineNumber);
 
         sandboxName.AppendLiteral(" (from: ");
-        sandboxName.Append(location);
+        sandboxName.Append(NS_ConvertUTF16toUTF8(location));
         sandboxName.AppendLiteral(":");
         sandboxName.AppendInt(lineNumber);
         sandboxName.AppendLiteral(")");

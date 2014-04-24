@@ -139,6 +139,16 @@ class Nursery
         return total;
     }
 
+    MOZ_ALWAYS_INLINE uintptr_t start() const {
+        JS_ASSERT(runtime_);
+        return ((JS::shadow::Runtime *)runtime_)->gcNurseryStart_;
+    }
+
+    MOZ_ALWAYS_INLINE uintptr_t heapEnd() const {
+        JS_ASSERT(runtime_);
+        return ((JS::shadow::Runtime *)runtime_)->gcNurseryEnd_;
+    }
+
   private:
     /*
      * The start and end pointers are stored under the runtime so that we can
@@ -190,16 +200,6 @@ class Nursery
         return reinterpret_cast<NurseryChunkLayout *>(start())[index];
     }
 
-    MOZ_ALWAYS_INLINE uintptr_t start() const {
-        JS_ASSERT(runtime_);
-        return ((JS::shadow::Runtime *)runtime_)->gcNurseryStart_;
-    }
-
-    MOZ_ALWAYS_INLINE uintptr_t heapEnd() const {
-        JS_ASSERT(runtime_);
-        return ((JS::shadow::Runtime *)runtime_)->gcNurseryEnd_;
-    }
-
     MOZ_ALWAYS_INLINE void setCurrentChunk(int chunkno) {
         JS_ASSERT(chunkno < NumNurseryChunks);
         JS_ASSERT(chunkno < numActiveChunks_);
@@ -212,9 +212,13 @@ class Nursery
     void updateDecommittedRegion() {
 #ifndef JS_GC_ZEAL
         if (numActiveChunks_ < NumNurseryChunks) {
+            // Bug 994054: madvise on MacOS is too slow to make this
+            //             optimization worthwhile.
+# ifndef XP_MACOSX
             uintptr_t decommitStart = chunk(numActiveChunks_).start();
             JS_ASSERT(decommitStart == AlignBytes(decommitStart, 1 << 20));
             gc::MarkPagesUnused(runtime(), (void *)decommitStart, heapEnd() - decommitStart);
+# endif
         }
 #endif
     }
@@ -310,10 +314,7 @@ class Nursery
 #endif
 
     friend class gc::MinorCollectionTracer;
-    friend class jit::CodeGenerator;
     friend class jit::MacroAssembler;
-    friend class jit::ICStubCompiler;
-    friend class jit::BaselineCompiler;
     friend void SetGCZeal(JSRuntime *, uint8_t, uint32_t);
 };
 

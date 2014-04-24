@@ -134,7 +134,14 @@ public:
    * position.
    */
   virtual nsSize GetScrollPositionClampingScrollPortSize() const = 0;
-
+  /**
+   * Get the element resolution.
+   */
+  virtual gfxSize GetResolution() const = 0;
+  /**
+   * Set the element resolution.
+   */
+  virtual void SetResolution(const gfxSize& aResolution) = 0;
   /**
    * Return how much we would try to scroll by in each direction if
    * asked to scroll by one "line" vertically and horizontally.
@@ -291,6 +298,11 @@ public:
    * counter.
    */
   virtual void ResetOriginIfScrollAtGeneration(uint32_t aGeneration) = 0;
+  /**
+   * Determine whether it is desirable to be able to asynchronously scroll this
+   * scroll frame.
+   */
+  virtual bool WantAsyncScroll() const = 0;
 };
 
 #endif

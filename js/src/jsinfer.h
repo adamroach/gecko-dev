@@ -20,6 +20,7 @@
 #include "ds/LifoAlloc.h"
 #include "gc/Barrier.h"
 #include "gc/Marking.h"
+#include "jit/IonTypes.h"
 #include "js/Utility.h"
 #include "js/Vector.h"
 
@@ -221,6 +222,10 @@ class Type
     JSValueType primitive() const {
         JS_ASSERT(isPrimitive());
         return (JSValueType) data;
+    }
+
+    bool isMagicArguments() const {
+        return primitive() == JSVAL_TYPE_MAGIC;
     }
 
     bool isSomeObject() const {
@@ -562,7 +567,7 @@ class TypeSet
     }
 
     /* Whether any values in this set might have the specified type. */
-    bool mightBeType(JSValueType type);
+    bool mightBeMIRType(jit::MIRType type);
 
     /*
      * Get whether this type set is known to be a subset of other.
@@ -607,7 +612,7 @@ class ConstraintTypeSet : public TypeSet
     /* Add a new constraint to this set. */
     bool addConstraint(JSContext *cx, TypeConstraint *constraint, bool callExisting = true);
 
-    inline void sweep(JS::Zone *zone);
+    inline void sweep(JS::Zone *zone, bool *oom);
 };
 
 class StackTypeSet : public ConstraintTypeSet
@@ -622,6 +627,7 @@ class HeapTypeSet : public ConstraintTypeSet
   public:
     /* Mark this type set as representing a non-data property. */
     inline void setNonDataProperty(ExclusiveContext *cx);
+    inline void setNonDataPropertyIgnoringConstraints(); // Variant for use during GC.
 
     /* Mark this type set as representing a non-writable property. */
     inline void setNonWritableProperty(ExclusiveContext *cx);
@@ -653,9 +659,9 @@ class TemporaryTypeSet : public TypeSet
      */
 
     /* Get any type tag which all values in this set must have. */
-    JSValueType getKnownTypeTag();
+    jit::MIRType getKnownMIRType();
 
-    bool isMagicArguments() { return getKnownTypeTag() == JSVAL_TYPE_MAGIC; }
+    bool isMagicArguments() { return getKnownMIRType() == jit::MIRType_MagicOptimizedArguments; }
 
     /* Whether this value may be an object. */
     bool maybeObject() { return unknownObject() || baseObjectCount() > 0; }
@@ -1122,13 +1128,14 @@ struct TypeObject : gc::BarrieredCell<TypeObject>
     void clearAddendum(ExclusiveContext *cx);
     void clearNewScriptAddendum(ExclusiveContext *cx);
     void clearTypedObjectAddendum(ExclusiveContext *cx);
+    void maybeClearNewScriptAddendumOnOOM();
     bool isPropertyNonData(jsid id);
     bool isPropertyNonWritable(jsid id);
 
     void print();
 
     inline void clearProperties();
-    inline void sweep(FreeOp *fop);
+    inline void sweep(FreeOp *fop, bool *oom);
 
     size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 
@@ -1284,7 +1291,7 @@ class TypeScript
 
     static void Purge(JSContext *cx, HandleScript script);
 
-    static void Sweep(FreeOp *fop, JSScript *script);
+    static void Sweep(FreeOp *fop, JSScript *script, bool *oom);
     void destroy();
 
     size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const {
@@ -1401,7 +1408,7 @@ class HeapTypeSetKey
     bool instantiate(JSContext *cx);
 
     void freeze(CompilerConstraintList *constraints);
-    JSValueType knownTypeTag(CompilerConstraintList *constraints);
+    jit::MIRType knownMIRType(CompilerConstraintList *constraints);
     bool nonData(CompilerConstraintList *constraints);
     bool nonWritable(CompilerConstraintList *constraints);
     bool isOwnProperty(CompilerConstraintList *constraints);
@@ -1431,12 +1438,16 @@ class CompilerOutput
     uint32_t sweepIndex_ : 29;
 
   public:
+    static const uint32_t INVALID_SWEEP_INDEX = (1 << 29) - 1;
+
     CompilerOutput()
-      : script_(nullptr), mode_(SequentialExecution), pendingInvalidation_(false)
+      : script_(nullptr), mode_(SequentialExecution),
+        pendingInvalidation_(false), sweepIndex_(INVALID_SWEEP_INDEX)
     {}
 
     CompilerOutput(JSScript *script, ExecutionMode mode)
-      : script_(script), mode_(mode), pendingInvalidation_(false)
+      : script_(script), mode_(mode),
+        pendingInvalidation_(false), sweepIndex_(INVALID_SWEEP_INDEX)
     {}
 
     JSScript *script() const { return script_; }
@@ -1459,11 +1470,15 @@ class CompilerOutput
     }
 
     void setSweepIndex(uint32_t index) {
-        if (index >= 1 << 29)
+        if (index >= INVALID_SWEEP_INDEX)
             MOZ_CRASH();
         sweepIndex_ = index;
     }
+    void invalidateSweepIndex() {
+        sweepIndex_ = INVALID_SWEEP_INDEX;
+    }
     uint32_t sweepIndex() {
+        JS_ASSERT(sweepIndex_ != INVALID_SWEEP_INDEX);
         return sweepIndex_;
     }
 };
@@ -1568,7 +1583,8 @@ struct TypeZone
 
     JS::Zone *zone() const { return zone_; }
 
-    void sweep(FreeOp *fop, bool releaseTypes);
+    void sweep(FreeOp *fop, bool releaseTypes, bool *oom);
+    void clearAllNewScriptAddendumsOnOOM();
 
     /* Mark a script as needing recompilation once inference has finished. */
     void addPendingRecompile(JSContext *cx, const RecompileInfo &info);

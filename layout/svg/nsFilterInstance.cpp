@@ -318,11 +318,11 @@ nsFilterInstance::BuildSourcePaint(SourceInfo *aSource,
 
   ctx->Translate(-neededRect.TopLeft());
 
-  nsRenderingContext tmpCtx;
-  tmpCtx.Init(mTargetFrame->PresContext()->DeviceContext(), ctx);
+  nsRefPtr<nsRenderingContext> tmpCtx(new nsRenderingContext());
+  tmpCtx->Init(mTargetFrame->PresContext()->DeviceContext(), ctx);
 
   gfxMatrix deviceToFilterSpace = GetFilterSpaceToDeviceSpaceTransform().Invert();
-  gfxContext *gfx = tmpCtx.ThebesContext();
+  gfxContext *gfx = tmpCtx->ThebesContext();
   gfx->Multiply(deviceToFilterSpace);
 
   gfx->Save();
@@ -401,8 +401,8 @@ nsFilterInstance::BuildSourceImage(gfxASurface* aTargetSurface,
 
   ctx->Translate(-neededRect.TopLeft());
 
-  nsRenderingContext tmpCtx;
-  tmpCtx.Init(mTargetFrame->PresContext()->DeviceContext(), ctx);
+  nsRefPtr<nsRenderingContext> tmpCtx(new nsRenderingContext());
+  tmpCtx->Init(mTargetFrame->PresContext()->DeviceContext(), ctx);
 
   gfxRect r = FilterSpaceToUserSpace(neededRect);
   r.RoundOut();
@@ -422,8 +422,8 @@ nsFilterInstance::BuildSourceImage(gfxASurface* aTargetSurface,
   // code more complex while being hard to get right without introducing
   // subtle bugs, and in practice it probably makes no real difference.)
   gfxMatrix deviceToFilterSpace = GetFilterSpaceToDeviceSpaceTransform().Invert();
-  tmpCtx.ThebesContext()->Multiply(deviceToFilterSpace);
-  mPaintCallback->Paint(&tmpCtx, mTargetFrame, &dirty, mTransformRoot);
+  tmpCtx->ThebesContext()->Multiply(deviceToFilterSpace);
+  mPaintCallback->Paint(tmpCtx, mTargetFrame, &dirty, mTransformRoot);
 
   RefPtr<SourceSurface> sourceGraphicSource;
 
@@ -589,30 +589,5 @@ nsFilterInstance::FilterSpaceToFrameSpace(const nsIntRect& aRect) const
 gfxMatrix
 nsFilterInstance::GetUserSpaceToFrameSpaceInCSSPxTransform() const
 {
-  gfxMatrix userToFrameSpaceInCSSPx;
-
-  if ((mTargetFrame->GetStateBits() & NS_FRAME_SVG_LAYOUT)) {
-    // As currently implemented by Mozilla for the purposes of filters, user
-    // space is the coordinate system established by GetCanvasTM(), since
-    // that's what we use to set filterToDeviceSpace above. In other words,
-    // for SVG, user space is actually the coordinate system aTarget
-    // establishes for _its_ children (i.e. after taking account of any x/y
-    // and viewBox attributes), not the coordinate system that is established
-    // for it by its 'transform' attribute (or by its _parent_) as it's
-    // normally defined. (XXX We should think about fixing this.) The only
-    // frame type for which these extra transforms are not simply an x/y
-    // translation is nsSVGInnerSVGFrame, hence we treat it specially here.
-    if (mTargetFrame->GetType() == nsGkAtoms::svgInnerSVGFrame) {
-      userToFrameSpaceInCSSPx =
-        static_cast<nsSVGElement*>(mTargetFrame->GetContent())->
-          PrependLocalTransformsTo(gfxMatrix());
-    } else {
-      gfxPoint targetsUserSpaceOffset =
-        nsLayoutUtils::RectToGfxRect(mTargetFrame->GetRect(),
-                                     mAppUnitsPerCSSPx).TopLeft();
-      userToFrameSpaceInCSSPx.Translate(-targetsUserSpaceOffset);
-    }
-  }
-  // else, for all other frames, leave as the identity matrix
-  return userToFrameSpaceInCSSPx;
+  return gfxMatrix().Translate(-nsSVGUtils::FrameSpaceInCSSPxToUserSpaceOffset(mTargetFrame));
 }

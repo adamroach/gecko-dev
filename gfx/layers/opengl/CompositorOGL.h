@@ -64,12 +64,13 @@ struct EffectChain;
  * This is primarily intended for direct texturing APIs that need to attach
  * shared objects (such as an EGLImage) to a gl texture.
  */
-class CompositorTexturePoolOGL : public RefCounted<CompositorTexturePoolOGL>
+class CompositorTexturePoolOGL
 {
-public:
-  MOZ_DECLARE_REFCOUNTED_TYPENAME(CompositorTexturePoolOGL)
-
+protected:
   virtual ~CompositorTexturePoolOGL() {}
+
+public:
+  NS_INLINE_DECL_REFCOUNTING(CompositorTexturePoolOGL)
 
   virtual void Clear() = 0;
 
@@ -155,7 +156,7 @@ protected:
 class CompositorOGL : public Compositor
 {
   typedef mozilla::gl::GLContext GLContext;
-  
+
   friend class GLManagerCompositor;
 
   std::map<ShaderConfigOGL, ShaderProgramOGL*> mPrograms;
@@ -181,7 +182,7 @@ public:
                                     SupportsPartialTextureUpdate());
   }
 
-  virtual TemporaryRef<CompositingRenderTarget> 
+  virtual TemporaryRef<CompositingRenderTarget>
   CreateRenderTarget(const gfx::IntRect &aRect, SurfaceInitMode aInit) MOZ_OVERRIDE;
 
   virtual TemporaryRef<CompositingRenderTarget>
@@ -284,7 +285,7 @@ private:
                                 const gfx::Matrix4x4 &aTransformi,
                                 GLuint aDrawMode);
 
-  /** 
+  /**
    * Context target, nullptr when drawing directly to our swap chain.
    */
   RefPtr<gfx::DrawTarget> mTarget;

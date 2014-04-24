@@ -13,7 +13,7 @@ let gEnableLogging = Services.prefs.getBoolPref("devtools.debugger.log");
 Services.prefs.setBoolPref("devtools.debugger.log", false);
 
 let { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
-let { Promise: promise } = Cu.import("resource://gre/modules/commonjs/sdk/core/promise.js", {});
+let { Promise: promise } = Cu.import("resource://gre/modules/Promise.jsm", {});
 let { gDevTools } = Cu.import("resource:///modules/devtools/gDevTools.jsm", {});
 let { devtools } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 let { require } = devtools;
@@ -118,7 +118,11 @@ function addAddon(aUrl) {
     let listener = {
       onInstallEnded: function(aAddon, aAddonInstall) {
         aInstaller.removeListener(listener);
-        deferred.resolve(aAddonInstall);
+
+        // Wait for add-on's startup scripts to execute. See bug 997408
+        executeSoon(function() {
+          deferred.resolve(aAddonInstall);
+        });
       }
     };
     aInstaller.addListener(listener);

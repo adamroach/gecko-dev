@@ -68,7 +68,7 @@ class MathCache
             return e.out;
         e.in = x;
         e.f = f;
-        return (e.out = f(x));
+        return e.out = f(x);
     }
 
     size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf);
@@ -128,13 +128,19 @@ extern bool
 math_sin(JSContext *cx, unsigned argc, js::Value *vp);
 
 extern double
-math_sin_impl(double x);
+math_sin_impl(MathCache *cache, double x);
+
+extern double
+math_sin_uncached(double x);
 
 extern bool
 math_cos(JSContext *cx, unsigned argc, js::Value *vp);
 
 extern double
-math_cos_impl(double x);
+math_cos_impl(MathCache *cache, double x);
+
+extern double
+math_cos_uncached(double x);
 
 extern bool
 math_exp(JSContext *cx, unsigned argc, js::Value *vp);
@@ -246,6 +252,9 @@ math_ceil(JSContext *cx, unsigned argc, Value *vp);
 
 extern double
 math_ceil_impl(double x);
+
+extern bool
+math_clz32(JSContext *cx, unsigned argc, Value *vp);
 
 extern bool
 math_floor(JSContext *cx, unsigned argc, Value *vp);

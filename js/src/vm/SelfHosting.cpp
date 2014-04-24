@@ -425,7 +425,7 @@ js::intrinsic_UnsafePutElements(JSContext *cx, unsigned argc, Value *vp)
 
         if (arrobj->is<TypedArrayObject>() || arrobj->is<TypedObject>()) {
             JS_ASSERT(!arrobj->is<TypedArrayObject>() || idx < arrobj->as<TypedArrayObject>().length());
-            JS_ASSERT(!arrobj->is<TypedObject>() || idx < arrobj->as<TypedObject>().length());
+            JS_ASSERT(!arrobj->is<TypedObject>() || idx < uint32_t(arrobj->as<TypedObject>().length()));
             RootedValue tmp(cx, args[elemi]);
             // XXX: Always non-strict.
             if (!JSObject::setElement(cx, arrobj, arrobj, idx, &tmp, false))
@@ -904,7 +904,6 @@ js::FillSelfHostingCompileOptions(CompileOptions &options)
     options.setFileAndLine("self-hosted", 1);
     options.setSelfHostingMode(true);
     options.setCanLazilyParse(false);
-    options.setSourcePolicy(CompileOptions::NO_SOURCE);
     options.setVersion(JSVERSION_LATEST);
     options.werrorOption = true;
     options.strictOption = true;
@@ -934,8 +933,11 @@ JSRuntime::initSelfHosting(JSContext *cx)
     RootedObject savedGlobal(cx, receivesDefaultObject
                                  ? js::DefaultObjectForContextOrNull(cx)
                                  : nullptr);
+    JS::CompartmentOptions compartmentOptions;
+    compartmentOptions.setDiscardSource(true);
     if (!(selfHostingGlobal_ = JS_NewGlobalObject(cx, &self_hosting_global_class,
-                                                  nullptr, JS::DontFireOnNewGlobalHook)))
+                                                  nullptr, JS::DontFireOnNewGlobalHook,
+                                                  compartmentOptions)))
         return false;
     JSAutoCompartment ac(cx, selfHostingGlobal_);
     if (receivesDefaultObject)

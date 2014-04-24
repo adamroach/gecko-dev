@@ -446,8 +446,7 @@ IndexedDatabaseManager::DefineIndexedDB(JSContext* aCx,
     return false;
   }
 
-  return JS_DefineProperty(aCx, aGlobal, IDB_STR, indexedDB, nullptr, nullptr,
-                           JSPROP_ENUMERATE);
+  return JS_DefineProperty(aCx, aGlobal, IDB_STR, indexedDB, JSPROP_ENUMERATE);
 }
 
 // static
@@ -608,7 +607,9 @@ IndexedDatabaseManager::AsyncDeleteFile(FileManager* aFileManager,
 
   // See if we're currently clearing the storages for this origin. If so then
   // we pretend that we've already deleted everything.
-  if (quotaManager->IsClearOriginPending(aFileManager->Origin())) {
+  if (quotaManager->IsClearOriginPending(
+                             aFileManager->Origin(),
+                             Nullable<PersistenceType>(aFileManager->Type()))) {
     return NS_OK;
   }
 

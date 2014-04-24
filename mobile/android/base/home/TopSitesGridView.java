@@ -9,8 +9,8 @@ import java.util.EnumSet;
 
 import org.mozilla.gecko.R;
 import org.mozilla.gecko.ThumbnailHelper;
-import org.mozilla.gecko.db.BrowserDB.TopSitesCursorWrapper;
 import org.mozilla.gecko.db.BrowserDB.URLColumns;
+import org.mozilla.gecko.db.TopSitesCursorWrapper;
 import org.mozilla.gecko.home.HomePager.OnUrlOpenListener;
 
 import android.content.Context;
@@ -125,7 +125,8 @@ public class TopSitesGridView extends GridView {
             public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
                 Cursor cursor = (Cursor) parent.getItemAtPosition(position);
 
-                if (cursor == null) {
+                TopSitesGridItemView gridView = (TopSitesGridItemView) view;
+                if (cursor == null || gridView.isEmpty()) {
                     mContextMenuInfo = null;
                     return false;
                 }

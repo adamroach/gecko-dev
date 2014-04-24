@@ -307,7 +307,7 @@ public:
   nsresult ScheduleStateMachine(int64_t aUsecs = 0);
 
   // Timer function to implement ScheduleStateMachine(aUsecs).
-  void TimeoutExpired();
+  nsresult TimeoutExpired(int aGeneration);
 
   // Set the media fragment end time. aEndTime is in microseconds.
   void SetFragmentEndTime(int64_t aEndTime);
@@ -731,7 +731,7 @@ private:
   // This is created and destroyed on the audio thread, while holding the
   // decoder monitor, so if this is used off the audio thread, you must
   // first acquire the decoder monitor and check that it is non-null.
-  nsAutoPtr<AudioStream> mAudioStream;
+  RefPtr<AudioStream> mAudioStream;
 
   // The reader, don't call its methods with the decoder monitor held.
   // This is created in the play state machine's constructor, and destroyed
@@ -937,6 +937,9 @@ private:
   mozilla::MediaMetadataManager mMetadataManager;
 
   MediaDecoderOwner::NextFrameStatus mLastFrameStatus;
+
+  // The id of timer tasks, used to ignore tasks that are scheduled previously.
+  int mTimerId;
 };
 
 } // namespace mozilla;

@@ -350,6 +350,7 @@ class ExclusiveContext : public ThreadSafeContext
 #endif
 
     inline void enterCompartment(JSCompartment *c);
+    inline void enterNullCompartment();
     inline void leaveCompartment(JSCompartment *oldCompartment);
 
     void setWorkerThread(WorkerThread *workerThread);
@@ -406,6 +407,10 @@ struct JSContext : public js::ExclusiveContext,
 
     JSRuntime *runtime() const { return runtime_; }
     js::PerThreadData &mainThread() const { return runtime()->mainThread; }
+
+    static size_t offsetOfRuntime() {
+        return offsetof(JSContext, runtime_);
+    }
 
     friend class js::ExclusiveContext;
     friend class JS::AutoSaveExceptionState;

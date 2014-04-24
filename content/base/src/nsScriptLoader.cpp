@@ -28,6 +28,7 @@
 #include "nsContentPolicyUtils.h"
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
+#include "nsITimedChannel.h"
 #include "nsIScriptElement.h"
 #include "nsIDOMHTMLScriptElement.h"
 #include "nsIDocShell.h"
@@ -53,6 +54,7 @@
 
 #include "mozilla/CORSMode.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/unused.h"
 
 #ifdef PR_LOGGING
 static PRLogModuleInfo* gCspPRLog;
@@ -124,7 +126,8 @@ nsScriptLoader::nsScriptLoader(nsIDocument *aDocument)
     mBlockerCount(0),
     mEnabled(true),
     mDeferEnabled(false),
-    mDocumentParsingDone(false)
+    mDocumentParsingDone(false),
+    mBlockingDOMContentLoaded(false)
 {
   // enable logging for CSP
 #ifdef PR_LOGGING
@@ -335,6 +338,12 @@ nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest, const nsAString &aType,
   nsCOMPtr<nsILoadContext> loadContext(do_QueryInterface(docshell));
   mozilla::net::SeerLearn(aRequest->mURI, mDocument->GetDocumentURI(),
       nsINetworkSeer::LEARN_LOAD_SUBRESOURCE, loadContext);
+
+  // Set the initiator type
+  nsCOMPtr<nsITimedChannel> timedChannel(do_QueryInterface(httpChannel));
+  if (timedChannel) {
+    timedChannel->SetInitiatorType(NS_LITERAL_STRING("script"));
+  }
 
   nsCOMPtr<nsIStreamLoader> loader;
   rv = NS_NewStreamLoader(getter_AddRefs(loader), this);
@@ -656,7 +665,7 @@ nsScriptLoader::ProcessScriptElement(nsIScriptElement *aElement)
       NS_ASSERTION(mDocument->GetCurrentContentSink() ||
                    aElement->GetParserCreated() == FROM_PARSER_XSLT,
           "Non-XSLT Defer script on a document without an active parser; bug 592366.");
-      mDeferRequests.AppendElement(request);
+      AddDeferRequest(request);
       return false;
     }
 
@@ -813,11 +822,10 @@ NotifyOffThreadScriptLoadCompletedRunnable::Run()
 static void
 OffThreadScriptLoaderCallback(void *aToken, void *aCallbackData)
 {
-  NotifyOffThreadScriptLoadCompletedRunnable* aRunnable =
-    static_cast<NotifyOffThreadScriptLoadCompletedRunnable*>(aCallbackData);
+  nsRefPtr<NotifyOffThreadScriptLoadCompletedRunnable> aRunnable =
+    dont_AddRef(static_cast<NotifyOffThreadScriptLoadCompletedRunnable*>(aCallbackData));
   aRunnable->SetToken(aToken);
   NS_DispatchToMainThread(aRunnable);
-  NS_RELEASE(aRunnable);
 }
 
 nsresult
@@ -847,11 +855,8 @@ nsScriptLoader::AttemptAsyncScriptParse(nsScriptLoadRequest* aRequest)
     return NS_ERROR_FAILURE;
   }
 
-  NotifyOffThreadScriptLoadCompletedRunnable* runnable =
+  nsRefPtr<NotifyOffThreadScriptLoadCompletedRunnable> runnable =
     new NotifyOffThreadScriptLoadCompletedRunnable(aRequest, this);
-
-  // This reference will be consumed by OffThreadScriptLoaderCallback.
-  NS_ADDREF(runnable);
 
   if (!JS::CompileOffThread(cx, options,
                             aRequest->mScriptText.get(), aRequest->mScriptText.Length(),
@@ -862,6 +867,7 @@ nsScriptLoader::AttemptAsyncScriptParse(nsScriptLoadRequest* aRequest)
 
   mDocument->BlockOnload();
 
+  unused << runnable.forget();
   return NS_OK;
 }
 
@@ -1171,6 +1177,9 @@ nsScriptLoader::ProcessPendingRequests()
       !mParserBlockingRequest && mAsyncRequests.IsEmpty() &&
       mNonAsyncExternalScriptInsertedRequests.IsEmpty() &&
       mXSLTRequests.IsEmpty() && mDeferRequests.IsEmpty()) {
+    if (MaybeRemovedDeferRequests()) {
+      return ProcessPendingRequests();
+    }
     // No more pending scripts; time to unblock onload.
     // OK to unblock onload synchronously here, since callers must be
     // prepared for the world changing anyway.
@@ -1487,4 +1496,28 @@ nsScriptLoader::PreloadURI(nsIURI *aURI, const nsAString &aCharset,
   PreloadInfo *pi = mPreloads.AppendElement();
   pi->mRequest = request;
   pi->mCharset = aCharset;
+}
+
+void
+nsScriptLoader::AddDeferRequest(nsScriptLoadRequest* aRequest)
+{
+  mDeferRequests.AppendElement(aRequest);
+  if (mDeferEnabled && mDeferRequests.Length() == 1 && mDocument &&
+      !mBlockingDOMContentLoaded) {
+    MOZ_ASSERT(mDocument->GetReadyStateEnum() == nsIDocument::READYSTATE_LOADING);
+    mBlockingDOMContentLoaded = true;
+    mDocument->BlockDOMContentLoaded();
+  }
+}
+
+bool
+nsScriptLoader::MaybeRemovedDeferRequests()
+{
+  if (mDeferRequests.Length() == 0 && mDocument &&
+      mBlockingDOMContentLoaded) {
+    mBlockingDOMContentLoaded = false;
+    mDocument->UnblockDOMContentLoaded();
+    return true;
+  }
+  return false;
 }

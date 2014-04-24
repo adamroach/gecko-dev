@@ -52,6 +52,9 @@ InterleaveAndConvertBuffer(const void** aSourceChannels,
                                aChannels,
                                aOutput);
     break;
+   case AUDIO_FORMAT_SILENCE:
+    // nothing to do here.
+    break;
   }
 }
 
@@ -121,7 +124,18 @@ void AudioSegment::ResampleChunks(SpeexResamplerState* aResampler)
 
   speex_resampler_get_rate(aResampler, &inRate, &outRate);
 
-  switch (mChunks[0].mBufferFormat) {
+  AudioSampleFormat format = AUDIO_FORMAT_SILENCE;
+  for (ChunkIterator ci(*this); !ci.IsEnded(); ci.Next()) {
+    if (ci->mBufferFormat != AUDIO_FORMAT_SILENCE) {
+      format = ci->mBufferFormat;
+    }
+  }
+
+  switch (format) {
+    // If the format is silence at this point, all the chunks are silent. The
+    // actual function we use does not matter, it's just a matter of changing
+    // the chunks duration.
+    case AUDIO_FORMAT_SILENCE:
     case AUDIO_FORMAT_FLOAT32:
       Resample<float>(aResampler, inRate, outRate);
     break;
@@ -161,7 +175,7 @@ AudioSegment::WriteTo(uint64_t aID, AudioStream* aOutput, AudioMixer* aMixer)
     // To avoid overbuffering in the AudioStream, we simply drop the silence,
     // here. The stream will underrun and output silence anyways.
     if (c.mBuffer || aOutput->GetWritten()) {
-      if (c.mBuffer) {
+      if (c.mBuffer && c.mBufferFormat != AUDIO_FORMAT_SILENCE) {
         channelData.SetLength(c.mChannelData.Length());
         for (uint32_t i = 0; i < channelData.Length(); ++i) {
           channelData[i] = c.mChannelData[i];

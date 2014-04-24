@@ -66,7 +66,10 @@ const NFC_IPC_WRITE_PERM_MSG_NAMES = [
 const NFC_IPC_MANAGER_PERM_MSG_NAMES = [
   "NFC:CheckP2PRegistration",
   "NFC:NotifyUserAcceptedP2P",
-  "NFC:NotifySendFileStatus"
+  "NFC:NotifySendFileStatus",
+  "NFC:StartPoll",
+  "NFC:StopPoll",
+  "NFC:PowerOff"
 ];
 
 XPCOMUtils.defineLazyServiceGetter(this, "ppmm",
@@ -413,13 +416,13 @@ function Nfc() {
   this.worker.onmessage = this.onmessage.bind(this);
 
   Services.obs.addObserver(this, NFC.TOPIC_MOZSETTINGS_CHANGED, false);
-  Services.obs.addObserver(this, NFC.TOPIC_HARDWARE_STATE, false);
 
   gMessageManager.init(this);
   let lock = gSettingsService.createLock();
   lock.get(NFC.SETTING_NFC_ENABLED, this);
   // Maps sessionId (that are generated from nfcd) with a unique guid : 'SessionToken'
   this.sessionTokenMap = {};
+  this.targetsByRequestId = {};
 
   gSystemWorkerManager.registerNfcWorker(this.worker);
 }
@@ -516,7 +519,14 @@ Nfc.prototype = {
         this.currentPeerAppId = null;
         break;
      case "ConfigResponse":
-        gSystemMessenger.broadcastMessage("nfc-powerlevel-change", message);
+        let target = this.targetsByRequestId[message.requestId];
+        if (!target) {
+          debug("No target for requestId: " + message.requestId);
+          return;
+        }
+        delete this.targetsByRequestId[message.requestId];
+
+        target.sendAsyncMessage("NFC:ConfigResponse", message);
         break;
       case "ConnectResponse": // Fall through.
       case "CloseResponse":
@@ -539,11 +549,31 @@ Nfc.prototype = {
 
   sessionTokenMap: null,
 
+  targetsByRequestId: null,
+
   /**
    * Process a message from the content process.
    */
   receiveMessage: function receiveMessage(message) {
     debug("Received '" + JSON.stringify(message) + "' message from content process");
+
+    // Handle messages without sessionToken.
+    if (message.name == "NFC:StartPoll") {
+      this.targetsByRequestId[message.json.requestId] = message.target;
+      this.setConfig({powerLevel: NFC.NFC_POWER_LEVEL_ENABLED,
+                      requestId: message.json.requestId});
+      return null;
+    } else if (message.name == "NFC:StopPoll") {
+      this.targetsByRequestId[message.json.requestId] = message.target;
+      this.setConfig({powerLevel: NFC.NFC_POWER_LEVEL_LOW,
+                      requestId: message.json.requestId});
+      return null;
+    } else if (message.name == "NFC:PowerOff") {
+      this.targetsByRequestId[message.json.requestId] = message.target;
+      this.setConfig({powerLevel: NFC.NFC_POWER_LEVEL_DISABLED,
+                      requestId: message.json.requestId});
+      return null;
+    }
 
     if (!this._enabled) {
       debug("NFC is not enabled.");
@@ -626,28 +656,11 @@ Nfc.prototype = {
           this.handle(setting.key, setting.value);
         }
         break;
-      case NFC.TOPIC_HARDWARE_STATE:
-        let state = JSON.parse(data);
-        if (state) {
-          let level = this.hardwareStateToPowerlevel(state.nfcHardwareState);
-          this.setConfig({ powerLevel: level });
-        }
-        break;
     }
   },
 
   setConfig: function setConfig(prop) {
     this.sendToWorker("config", prop);
-  },
-
-  hardwareStateToPowerlevel: function hardwareStateToPowerlevel(state) {
-    switch (state) {
-      case 0:   return NFC.NFC_POWER_LEVEL_DISABLED;
-      case 1:   return NFC.NFC_POWER_LEVEL_ENABLED;
-      case 2:   return NFC.NFC_POWER_LEVEL_ENABLED;
-      case 3:   return NFC.NFC_POWER_LEVEL_LOW;
-      default:  return NFC.NFC_POWER_LEVEL_UNKNOWN;
-    }
   }
 };
 

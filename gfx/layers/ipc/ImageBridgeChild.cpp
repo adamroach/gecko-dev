@@ -110,6 +110,10 @@ void
 ImageBridgeChild::UseTexture(CompositableClient* aCompositable,
                              TextureClient* aTexture)
 {
+  MOZ_ASSERT(aCompositable);
+  MOZ_ASSERT(aTexture);
+  MOZ_ASSERT(aCompositable->GetIPDLActor());
+  MOZ_ASSERT(aTexture->GetIPDLActor());
   mTxn->AddNoSwapEdit(OpUseTexture(nullptr, aCompositable->GetIPDLActor(),
                                    nullptr, aTexture->GetIPDLActor()));
 }
@@ -119,6 +123,12 @@ ImageBridgeChild::UseComponentAlphaTextures(CompositableClient* aCompositable,
                                             TextureClient* aTextureOnBlack,
                                             TextureClient* aTextureOnWhite)
 {
+  MOZ_ASSERT(aCompositable);
+  MOZ_ASSERT(aTextureOnWhite);
+  MOZ_ASSERT(aTextureOnBlack);
+  MOZ_ASSERT(aCompositable->GetIPDLActor());
+  MOZ_ASSERT(aTextureOnWhite->GetIPDLActor());
+  MOZ_ASSERT(aTextureOnBlack->GetIPDLActor());
   MOZ_ASSERT(aTextureOnBlack->GetSize() == aTextureOnWhite->GetSize());
   mTxn->AddNoSwapEdit(OpUseComponentAlphaTextures(nullptr, aCompositable->GetIPDLActor(),
                                                   nullptr, aTextureOnBlack->GetIPDLActor(),
@@ -130,6 +140,10 @@ ImageBridgeChild::UpdatedTexture(CompositableClient* aCompositable,
                                  TextureClient* aTexture,
                                  nsIntRegion* aRegion)
 {
+  MOZ_ASSERT(aCompositable);
+  MOZ_ASSERT(aTexture);
+  MOZ_ASSERT(aCompositable->GetIPDLActor());
+  MOZ_ASSERT(aTexture->GetIPDLActor());
   MaybeRegion region = aRegion ? MaybeRegion(*aRegion)
                                : MaybeRegion(null_t());
   mTxn->AddNoSwapEdit(OpUpdateTexture(nullptr, aCompositable->GetIPDLActor(),
@@ -141,6 +155,8 @@ void
 ImageBridgeChild::UpdatePictureRect(CompositableClient* aCompositable,
                                     const nsIntRect& aRect)
 {
+  MOZ_ASSERT(aCompositable);
+  MOZ_ASSERT(aCompositable->GetIPDLActor());
   mTxn->AddNoSwapEdit(OpUpdatePictureRect(nullptr, aCompositable->GetIPDLActor(), aRect));
 }
 
@@ -292,6 +308,10 @@ void ImageBridgeChild::StartUp()
   ImageBridgeChild::StartUpOnThread(new Thread("ImageBridgeChild"));
 }
 
+#ifdef MOZ_NUWA_PROCESS
+#include "ipc/Nuwa.h"
+#endif
+
 static void
 ConnectImageBridgeInChildProcess(Transport* aTransport,
                                  ProcessHandle aOtherProcess)
@@ -300,11 +320,16 @@ ConnectImageBridgeInChildProcess(Transport* aTransport,
   sImageBridgeChildSingleton->Open(aTransport, aOtherProcess,
                                    XRE_GetIOMessageLoop(),
                                    ipc::ChildSide);
-}
-
 #ifdef MOZ_NUWA_PROCESS
-#include "ipc/Nuwa.h"
+  if (IsNuwaProcess()) {
+    sImageBridgeChildThread
+      ->message_loop()->PostTask(FROM_HERE,
+                                 NewRunnableFunction(NuwaMarkCurrentThread,
+                                                     (void (*)(void *))nullptr,
+                                                     (void *)nullptr));
+  }
 #endif
+}
 
 static void ReleaseImageClientNow(ImageClient* aClient)
 {
@@ -511,16 +536,6 @@ ImageBridgeChild::StartUpInChildProcess(Transport* aTransport,
   if (!sImageBridgeChildThread->Start()) {
     return nullptr;
   }
-
-#ifdef MOZ_NUWA_PROCESS
-  if (IsNuwaProcess()) {
-    sImageBridgeChildThread
-      ->message_loop()->PostTask(FROM_HERE,
-                                 NewRunnableFunction(NuwaMarkCurrentThread,
-                                                     (void (*)(void *))nullptr,
-                                                     (void *)nullptr));
-  }
-#endif
 
   sImageBridgeChildSingleton = new ImageBridgeChild();
   sImageBridgeChildSingleton->GetMessageLoop()->PostTask(

@@ -989,6 +989,9 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
         movePtr(imm, ScratchRegister);
         branchPtr(cond, lhs, ScratchRegister, label);
     }
+    void branchPtr(Condition cond, Register lhs, Imm32 imm, Label *label) {
+        branch32(cond, lhs, imm, label);
+    }
     void decBranchPtr(Condition cond, const Register &lhs, Imm32 imm, Label *label) {
         subPtr(imm, lhs);
         branch32(cond, lhs, Imm32(0), label);
@@ -1374,6 +1377,7 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
     void cmpPtr(const Register &lhs, const ImmPtr &rhs);
     void cmpPtr(const Register &lhs, const Register &rhs);
     void cmpPtr(const Register &lhs, const ImmGCPtr &rhs);
+    void cmpPtr(const Register &lhs, const Imm32 &rhs);
     void cmpPtr(const Address &lhs, const Register &rhs);
     void cmpPtr(const Address &lhs, const ImmWord &rhs);
     void cmpPtr(const Address &lhs, const ImmPtr &rhs);
@@ -1555,6 +1559,11 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
     void moveFloat32(FloatRegister src, FloatRegister dest) {
         as_vmov(VFPRegister(src).singleOverlay(), VFPRegister(dest).singleOverlay());
     }
+
+#ifdef JSGC_GENERATIONAL
+    void branchPtrInNurseryRange(Register ptr, Register temp, Label *label);
+    void branchValueIsNurseryObject(ValueOperand value, Register temp, Label *label);
+#endif
 };
 
 typedef MacroAssemblerARMCompat MacroAssemblerSpecific;
