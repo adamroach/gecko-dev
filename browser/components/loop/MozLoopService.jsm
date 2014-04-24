@@ -1,0 +1,58 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
+
+Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+
+this.EXPORTED_SYMBOLS = ["MozLoopService"];
+
+// Internal helper methods and state
+let MozLoopServiceInternal = {
+  get localizedStrings() {
+    var stringBundle =
+      Services.strings.createBundle('chrome://browser/locale/loop/loop.properties');
+
+    var map = {};
+    var enumerator = stringBundle.getSimpleEnumeration();
+    while (enumerator.hasMoreElements()) {
+      var string = enumerator.getNext().QueryInterface(Ci.nsIPropertyElement);
+      var key = string.key, property = 'textContent';
+      var i = key.lastIndexOf('.');
+      if (i >= 0) {
+        property = key.substring(i + 1);
+        key = key.substring(0, i);
+      }
+      if (!(key in map))
+        map[key] = {};
+      map[key][property] = string.value;
+    }
+
+    delete this.localizedStrings;
+    return this.localizedStrings = map;
+  }
+};
+
+
+// Public API
+this.MozLoopService = {
+  getStrings: function(key) {
+    try {
+      return JSON.stringify(MozLoopServiceInternal.localizedStrings[key]);
+    } catch (ex) {
+      Cu.reportError('Unable to retrive localized strings: ' + e);
+      return null;
+    }
+  },
+
+  get locale() {
+    try {
+      return Services.prefs.getComplexValue("general.useragent.locale",
+        Ci.nsISupportsString).data;
+    } catch (ex) {
+      return "en-US";
+    }
+  }
+};
