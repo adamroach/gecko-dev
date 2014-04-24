@@ -4,6 +4,14 @@
 
 interface nsIDOMMediaStream;
 interface nsIDOMDataChannel;
+interface nsIObserver;
+
+[scriptable, function, uuid(6637e8d1-e4eb-46d8-bba3-80cf47d93d41)]
+interface ICreationWatcher : nsISupports
+{
+  void onCreation();
+};
+
 
 /*
  * Manager interface to PeerConnection.js so it is accessible from C++.
@@ -12,6 +20,9 @@ interface nsIDOMDataChannel;
 interface IPeerConnectionManager : nsISupports
 {
   boolean hasActivePeerConnection(in unsigned long innerWindowID);
+
+  void subscribeToCreationsForWindow(in unsigned long innerWindowID,
+                                     in nsIObserver observer);
 };
 
 %{C++
