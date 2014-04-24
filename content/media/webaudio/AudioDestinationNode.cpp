@@ -147,6 +147,18 @@ public:
     context->DispatchTrustedEvent(event);
   }
 
+  virtual size_t SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const MOZ_OVERRIDE
+  {
+    size_t amount = AudioNodeEngine::SizeOfExcludingThis(aMallocSizeOf);
+    amount += mInputChannels.SizeOfExcludingThis(aMallocSizeOf);
+    return amount;
+  }
+
+  virtual size_t SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const MOZ_OVERRIDE
+  {
+    return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
+  }
+
 private:
   // The input to the destination node is recorded in the mInputChannels buffer.
   // When this buffer fills up with mLength frames, the buffered input is sent
@@ -187,6 +199,11 @@ public:
   enum Parameters {
     VOLUME,
   };
+
+  virtual size_t SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const MOZ_OVERRIDE
+  {
+    return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
+  }
 
 private:
   float mVolume;
@@ -254,6 +271,21 @@ AudioDestinationNode::AudioDestinationNode(AudioContext* aContext,
 
     CreateAudioChannelAgent();
   }
+}
+
+size_t
+AudioDestinationNode::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const
+{
+  size_t amount = AudioNode::SizeOfExcludingThis(aMallocSizeOf);
+  // Might be useful in the future:
+  // - mAudioChannelAgent
+  return amount;
+}
+
+size_t
+AudioDestinationNode::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const
+{
+  return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
 }
 
 void
@@ -477,40 +509,10 @@ AudioDestinationNode::CreateAudioChannelAgent()
     mAudioChannelAgent->StopPlaying();
   }
 
-  AudioChannelType type = AUDIO_CHANNEL_NORMAL;
-  switch(mAudioChannel) {
-    case AudioChannel::Normal:
-      type = AUDIO_CHANNEL_NORMAL;
-      break;
-
-    case AudioChannel::Content:
-      type = AUDIO_CHANNEL_CONTENT;
-      break;
-
-    case AudioChannel::Notification:
-      type = AUDIO_CHANNEL_NOTIFICATION;
-      break;
-
-    case AudioChannel::Alarm:
-      type = AUDIO_CHANNEL_ALARM;
-      break;
-
-    case AudioChannel::Telephony:
-      type = AUDIO_CHANNEL_TELEPHONY;
-      break;
-
-    case AudioChannel::Ringer:
-      type = AUDIO_CHANNEL_RINGER;
-      break;
-
-    case AudioChannel::Publicnotification:
-      type = AUDIO_CHANNEL_PUBLICNOTIFICATION;
-      break;
-
-  }
-
   mAudioChannelAgent = new AudioChannelAgent();
-  mAudioChannelAgent->InitWithWeakCallback(GetOwner(), type, this);
+  mAudioChannelAgent->InitWithWeakCallback(GetOwner(),
+                                           static_cast<int32_t>(mAudioChannel),
+                                           this);
 
   nsCOMPtr<nsIDocShell> docshell = do_GetInterface(GetOwner());
   if (docshell) {

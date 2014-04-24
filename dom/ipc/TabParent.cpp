@@ -554,17 +554,12 @@ void TabParent::HandleLongTapUp(const CSSPoint& aPoint,
   }
 }
 
-void TabParent::NotifyTransformBegin(ViewID aViewId)
+void TabParent::NotifyAPZStateChange(ViewID aViewId,
+                                     APZStateChange aChange,
+                                     int aArg)
 {
   if (!mIsDestroyed) {
-    unused << SendNotifyTransformBegin(aViewId);
-  }
-}
-
-void TabParent::NotifyTransformEnd(ViewID aViewId)
-{
-  if (!mIsDestroyed) {
-    unused << SendNotifyTransformEnd(aViewId);
+    unused << SendNotifyAPZStateChange(aViewId, aChange, aArg);
   }
 }
 
@@ -794,6 +789,41 @@ static void
 DoCommandCallback(mozilla::Command aCommand, void* aData)
 {
   static_cast<InfallibleTArray<mozilla::CommandInt>*>(aData)->AppendElement(aCommand);
+}
+
+bool
+TabParent::RecvRequestNativeKeyBindings(const WidgetKeyboardEvent& aEvent,
+                                        MaybeNativeKeyBinding* aBindings)
+{
+  AutoInfallibleTArray<mozilla::CommandInt, 4> singleLine;
+  AutoInfallibleTArray<mozilla::CommandInt, 4> multiLine;
+  AutoInfallibleTArray<mozilla::CommandInt, 4> richText;
+
+  *aBindings = mozilla::void_t();
+
+  nsCOMPtr<nsIWidget> widget = GetWidget();
+  if (!widget) {
+    return true;
+  }
+
+  WidgetKeyboardEvent localEvent(aEvent);
+
+  if (NS_FAILED(widget->AttachNativeKeyEvent(localEvent))) {
+    return true;
+  }
+
+  widget->ExecuteNativeKeyBinding(nsIWidget::NativeKeyBindingsForSingleLineEditor,
+                                  localEvent, DoCommandCallback, &singleLine);
+  widget->ExecuteNativeKeyBinding(nsIWidget::NativeKeyBindingsForMultiLineEditor,
+                                  localEvent, DoCommandCallback, &multiLine);
+  widget->ExecuteNativeKeyBinding(nsIWidget::NativeKeyBindingsForRichTextEditor,
+                                  localEvent, DoCommandCallback, &richText);
+
+  if (!singleLine.IsEmpty() || !multiLine.IsEmpty() || !richText.IsEmpty()) {
+    *aBindings = NativeKeyBinding(singleLine, multiLine, richText);
+  }
+
+  return true;
 }
 
 bool TabParent::SendRealKeyEvent(WidgetKeyboardEvent& event)

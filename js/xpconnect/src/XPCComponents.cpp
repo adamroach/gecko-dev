@@ -2599,7 +2599,7 @@ nsXPCComponents_Utils::ReportError(HandleValue error, JSContext *cx)
     nsXPConnect *xpc = nsXPConnect::XPConnect();
     xpc->GetCurrentJSStack(getter_AddRefs(frame));
 
-    nsCString fileName;
+    nsString fileName;
     int32_t lineNo = 0;
     if (frame) {
         frame->GetFilename(fileName);
@@ -2612,7 +2612,7 @@ nsXPCComponents_Utils::ReportError(HandleValue error, JSContext *cx)
 
     nsresult rv = scripterr->InitWithWindowID(
             nsDependentString(static_cast<const char16_t *>(msgchars)),
-            NS_ConvertUTF8toUTF16(fileName), EmptyString(), lineNo, 0, 0,
+            fileName, EmptyString(), lineNo, 0, 0,
             "XPConnect JavaScript", innerWindowID);
     NS_ENSURE_SUCCESS(rv, NS_OK);
 
@@ -2672,7 +2672,9 @@ nsXPCComponents_Utils::EvalInSandbox(const nsAString& source,
         nsCOMPtr<nsIStackFrame> frame;
         xpc->GetCurrentJSStack(getter_AddRefs(frame));
         if (frame) {
-            frame->GetFilename(filename);
+            nsString frameFile;
+            frame->GetFilename(frameFile);
+            CopyUTF16toUTF8(frameFile, filename);
             frame->GetLineNumber(&lineNo);
         }
     }
@@ -3255,7 +3257,7 @@ nsXPCComponents_Utils::BlockScriptForGlobal(HandleValue globalArg,
     RootedObject global(cx, UncheckedUnwrap(&globalArg.toObject(),
                                             /* stopAtOuter = */ false));
     NS_ENSURE_TRUE(JS_IsGlobalObject(global), NS_ERROR_INVALID_ARG);
-    if (nsContentUtils::IsSystemPrincipal(GetObjectPrincipal(global))) {
+    if (nsContentUtils::IsSystemPrincipal(xpc::GetObjectPrincipal(global))) {
         JS_ReportError(cx, "Script may not be disabled for system globals");
         return NS_ERROR_FAILURE;
     }
@@ -3271,7 +3273,7 @@ nsXPCComponents_Utils::UnblockScriptForGlobal(HandleValue globalArg,
     RootedObject global(cx, UncheckedUnwrap(&globalArg.toObject(),
                                             /* stopAtOuter = */ false));
     NS_ENSURE_TRUE(JS_IsGlobalObject(global), NS_ERROR_INVALID_ARG);
-    if (nsContentUtils::IsSystemPrincipal(GetObjectPrincipal(global))) {
+    if (nsContentUtils::IsSystemPrincipal(xpc::GetObjectPrincipal(global))) {
         JS_ReportError(cx, "Script may not be disabled for system globals");
         return NS_ERROR_FAILURE;
     }
@@ -3429,12 +3431,12 @@ nsXPCComponents_Utils::GetJSEngineTelemetryValue(JSContext *cx, MutableHandleVal
 
     size_t i = JS_SetProtoCalled(cx);
     RootedValue v(cx, DoubleValue(i));
-    if (!JS_DefineProperty(cx, obj, "setProto", v, nullptr, nullptr, attrs))
+    if (!JS_DefineProperty(cx, obj, "setProto", v, attrs))
         return NS_ERROR_OUT_OF_MEMORY;
 
     i = JS_GetCustomIteratorCount(cx);
     v.setDouble(i);
-    if (!JS_DefineProperty(cx, obj, "customIter", v, nullptr, nullptr, attrs))
+    if (!JS_DefineProperty(cx, obj, "customIter", v, attrs))
         return NS_ERROR_OUT_OF_MEMORY;
 
     rval.setObject(*obj);
@@ -3611,6 +3613,21 @@ nsXPCComponents_Utils::GetWebIDLCallerPrincipal(nsIPrincipal **aResult)
     if (!callerPrin)
         return NS_ERROR_NOT_AVAILABLE;
     callerPrin.forget(aResult);
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsXPCComponents_Utils::GetObjectPrincipal(HandleValue val, JSContext *cx,
+                                          nsIPrincipal **result)
+{
+    if (!val.isObject())
+        return NS_ERROR_INVALID_ARG;
+    RootedObject obj(cx, &val.toObject());
+    obj = js::CheckedUnwrap(obj);
+    MOZ_ASSERT(obj);
+
+    nsCOMPtr<nsIPrincipal> prin = nsContentUtils::GetObjectPrincipal(obj);
+    prin.forget(result);
     return NS_OK;
 }
 

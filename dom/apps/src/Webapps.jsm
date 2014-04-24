@@ -61,6 +61,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "WebappOSUtils",
 XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
   "resource://gre/modules/NetUtil.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "ScriptPreloader",
+                                  "resource://gre/modules/ScriptPreloader.jsm");
+
 #ifdef MOZ_WIDGET_GONK
 XPCOMUtils.defineLazyGetter(this, "libcutils", function() {
   Cu.import("resource://gre/modules/systemlibs.js");
@@ -734,7 +737,6 @@ this.DOMApplicationRegistry = {
                            handlerPageURI,
                            manifestURI,
                            connection.description,
-                           AppsUtils.getAppManifestStatus(manifest),
                            connection.rules);
     }
   },
@@ -1489,7 +1491,9 @@ this.DOMApplicationRegistry = {
 
         delete app.retryingDownload;
 
-        this._saveApps().then(() => {
+        // Update the asm.js scripts we need to compile.
+        ScriptPreloader.preload(app, aData)
+          .then(() => this._saveApps()).then(() => {
           // Update the handlers and permissions for this app.
           this.updateAppHandlers(aOldManifest, aData, app);
 
@@ -2336,6 +2340,76 @@ onInstallSuccessAck: function onInstallSuccessAck(aManifestURL,
     this._writeFile(manFile, JSON.stringify(aJsonManifest));
   },
 
+  // Add an app that is already installed to the registry.
+  addInstalledApp: Task.async(function*(aApp, aManifest, aUpdateManifest) {
+    if (this.getAppLocalIdByManifestURL(aApp.manifestURL) !=
+        Ci.nsIScriptSecurityManager.NO_APP_ID) {
+      return;
+    }
+
+    let app = AppsUtils.cloneAppObject(aApp);
+
+    if (!AppsUtils.checkManifest(aManifest, app) ||
+        (aUpdateManifest && !AppsUtils.checkManifest(aUpdateManifest, app))) {
+      return;
+    }
+
+    app.name = aManifest.name;
+
+    app.csp = aManifest.csp || "";
+
+    app.appStatus = AppsUtils.getAppManifestStatus(aManifest);
+
+    app.removable = true;
+
+    // Reuse the app ID if the scheme is "app".
+    let uri = Services.io.newURI(app.origin, null, null);
+    if (uri.scheme == "app") {
+      app.id = uri.host;
+    } else {
+      app.id = this.makeAppId();
+    }
+
+    app.localId = this._nextLocalId();
+
+    app.basePath = OS.Path.dirname(this.appsFile);
+
+    app.progress = 0.0;
+    app.installState = "installed";
+    app.downloadAvailable = false;
+    app.downloading = false;
+    app.readyToApplyDownload = false;
+
+    if (aUpdateManifest && aUpdateManifest.size) {
+      app.downloadSize = aUpdateManifest.size;
+    }
+
+    app.manifestHash = AppsUtils.computeHash(JSON.stringify(aUpdateManifest ||
+                                                            aManifest));
+
+    let zipFile = WebappOSUtils.getPackagePath(app);
+    app.packageHash = yield this._computeFileHash(zipFile);
+
+    app.role = aManifest.role || "";
+
+    app.redirects = this.sanitizeRedirects(aManifest.redirects);
+
+    this.webapps[app.id] = app;
+
+    // Store the manifest in the manifest cache, so we don't need to re-read it
+    this._manifestCache[app.id] = app.manifest;
+
+    // Store the manifest and the updateManifest.
+    this._writeManifestFile(app.id, false, aManifest);
+    if (aUpdateManifest) {
+      this._writeManifestFile(app.id, true, aUpdateManifest);
+    }
+
+    this._saveApps().then(() => {
+      this.broadcastMessage("Webapps:AddApp", { id: app.id, app: app });
+    });
+  }),
+
   confirmInstall: function(aData, aProfileDir, aInstallSuccessCallback) {
     debug("confirmInstall");
 
@@ -2525,13 +2599,19 @@ onInstallSuccessAck: function onInstallSuccessAck(aManifestURL,
         manifest: aManifest,
         manifestURL: aNewApp.manifestURL
       });
-      this.broadcastMessage("Webapps:FireEvent", {
-        eventType: ["downloadsuccess", "downloadapplied"],
-        manifestURL: aNewApp.manifestURL
-      });
-      if (aInstallSuccessCallback) {
-        aInstallSuccessCallback(aManifest, zipFile.path);
-      }
+
+      // Check if we have asm.js code to preload for this application.
+      ScriptPreloader.preload(aNewApp, aManifest)
+                     .then(() => {
+          this.broadcastMessage("Webapps:FireEvent", {
+            eventType: ["downloadsuccess", "downloadapplied"],
+            manifestURL: aNewApp.manifestURL
+          });
+          if (aInstallSuccessCallback) {
+            aInstallSuccessCallback(aManifest, zipFile.path);
+          }
+        }
+      );
     });
   },
 

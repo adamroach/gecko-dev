@@ -212,14 +212,18 @@ public:
     void HandleLongTapUp(const CSSPoint& aPoint,
                          int32_t aModifiers,
                          const ScrollableLayerGuid& aGuid);
-    void NotifyTransformBegin(ViewID aViewId);
-    void NotifyTransformEnd(ViewID aViewId);
+    void NotifyAPZStateChange(ViewID aViewId,
+                              APZStateChange aChange,
+                              int aArg);
     void Activate();
     void Deactivate();
 
     bool MapEventCoordinatesForChildProcess(mozilla::WidgetEvent* aEvent);
     void MapEventCoordinatesForChildProcess(const LayoutDeviceIntPoint& aOffset,
                                             mozilla::WidgetEvent* aEvent);
+
+    virtual bool RecvRequestNativeKeyBindings(const mozilla::WidgetKeyboardEvent& aEvent,
+                                              MaybeNativeKeyBinding* aBindings) MOZ_OVERRIDE;
 
     void SendMouseEvent(const nsAString& aType, float aX, float aY,
                         int32_t aButton, int32_t aClickCount,

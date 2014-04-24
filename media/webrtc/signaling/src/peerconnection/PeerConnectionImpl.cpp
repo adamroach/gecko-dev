@@ -1600,7 +1600,11 @@ PeerConnectionImpl::Close()
   CSFLogDebug(logTag, "%s: for %s", __FUNCTION__, mHandle.c_str());
   PC_AUTO_ENTER_API_CALL_NO_CHECK();
 
-  return CloseInt();
+  nsresult res = CloseInt();
+
+  SetSignalingState_m(PCImplSignalingState::SignalingClosed);
+
+  return res;
 }
 
 
@@ -1753,7 +1757,8 @@ void
 PeerConnectionImpl::SetSignalingState_m(PCImplSignalingState aSignalingState)
 {
   PC_AUTO_ENTER_API_CALL_NO_CHECK();
-  if (mSignalingState == aSignalingState) {
+  if (mSignalingState == aSignalingState ||
+      mSignalingState == PCImplSignalingState::SignalingClosed) {
     return;
   }
 
@@ -1770,7 +1775,13 @@ PeerConnectionImpl::SetSignalingState_m(PCImplSignalingState aSignalingState)
 bool
 PeerConnectionImpl::IsClosed() const
 {
-  return !mMedia;
+  return mSignalingState == PCImplSignalingState::SignalingClosed;
+}
+
+bool
+PeerConnectionImpl::HasMedia() const
+{
+  return mMedia;
 }
 
 PeerConnectionWrapper::PeerConnectionWrapper(const std::string& handle)
@@ -1952,7 +1963,7 @@ PeerConnectionImpl::BuildStatsQuery_m(
     mozilla::dom::MediaStreamTrack *aSelector,
     RTCStatsQuery *query) {
 
-  if (IsClosed()) {
+  if (!HasMedia()) {
     return NS_OK;
   }
 

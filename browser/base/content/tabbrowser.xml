@@ -81,6 +81,10 @@
          Components.classes["@mozilla.org/autocomplete/search;1?name=history"]
                    .getService(Components.interfaces.mozIPlacesAutoComplete);
       </field>
+      <field name="_unifiedComplete" readonly="true">
+         Components.classes["@mozilla.org/autocomplete/search;1?name=unifiedcomplete"]
+                   .getService(Components.interfaces.mozIPlacesAutoComplete);
+      </field>
       <field name="mTabBox" readonly="true">
         document.getAnonymousElementByAttribute(this, "anonid", "tabbox");
       </field>
@@ -286,7 +290,6 @@
             return;
 
           this.moveTabTo(aTab, this._numPinnedTabs - 1);
-          aTab.setAttribute("fadein", "true");
           aTab.removeAttribute("pinned");
           aTab.style.MozMarginStart = "";
           this.tabContainer._unlockTabSizing();
@@ -744,8 +747,10 @@
                 }
 
                 let autocomplete = this.mTabBrowser._placesAutocomplete;
+                let unifiedComplete = this.mTabBrowser._unifiedComplete;
                 if (this.mBrowser.registeredOpenURI) {
                   autocomplete.unregisterOpenPage(this.mBrowser.registeredOpenURI);
+                  unifiedComplete.unregisterOpenPage(this.mBrowser.registeredOpenURI);
                   delete this.mBrowser.registeredOpenURI;
                 }
                 // Tabs in private windows aren't registered as "Open" so
@@ -754,6 +759,7 @@
                     (!PrivateBrowsingUtils.isWindowPrivate(window) ||
                     PrivateBrowsingUtils.permanentPrivateBrowsing)) {
                   autocomplete.registerOpenPage(aLocation);
+                  unifiedComplete.registerOpenPage(aLocation);
                   this.mBrowser.registeredOpenURI = aLocation;
                 }
               }
@@ -1006,12 +1012,12 @@
             this.mCurrentTab = this.tabContainer.selectedItem;
             this.showTab(this.mCurrentTab);
 
-            var backForwardContainer = document.getElementById("urlbar-container");
-            if (backForwardContainer) {
-              backForwardContainer.setAttribute("switchingtabs", "true");
+            var forwardButtonContainer = document.getElementById("urlbar-wrapper");
+            if (forwardButtonContainer) {
+              forwardButtonContainer.setAttribute("switchingtabs", "true");
               window.addEventListener("MozAfterPaint", function removeSwitchingtabsAttr() {
                 window.removeEventListener("MozAfterPaint", removeSwitchingtabsAttr);
-                backForwardContainer.removeAttribute("switchingtabs");
+                forwardButtonContainer.removeAttribute("switchingtabs");
               });
             }
 
@@ -1119,6 +1125,11 @@
 
               // Adjust focus
               oldBrowser._urlbarFocused = (gURLBar && gURLBar.focused);
+              if (this.isFindBarInitialized(oldTab)) {
+                let findBar = this.getFindBar(oldTab);
+                oldTab._findBarFocused = (!findBar.hidden &&
+                  findBar._findField.getAttribute("focused") == "true");
+              }
               do {
                 // When focus is in the tab bar, retain it there.
                 if (document.activeElement == oldTab) {
@@ -1154,8 +1165,9 @@
                   }
                 }
 
-                // If the find bar is open, focus it.
-                if (gFindBarInitialized && !gFindBar.hidden) {
+                // Focus the find bar if it was previously focused for that tab.
+                if (gFindBarInitialized && !gFindBar.hidden &&
+                    this.selectedTab._findBarFocused) {
                   gFindBar._findField.focus();
                   break;
                 }
@@ -1672,12 +1684,6 @@
 
                 // kick the animation off
                 t.setAttribute("fadein", "true");
-
-                // This call to adjustTabstrip is redundant but needed so that
-                // when opening a second tab, the first tab's close buttons
-                // appears immediately rather than when the transition ends.
-                if (this.tabs.length - this._removingTabs.length == 2)
-                  this.tabContainer.adjustTabstrip();
               }.bind(this));
             }
 
@@ -1863,13 +1869,6 @@
             aTab.style.maxWidth = ""; // ensure that fade-out transition happens
             aTab.removeAttribute("fadein");
 
-            if (this.tabs.length - this._removingTabs.length == 1) {
-              // The second tab just got closed and we will end up with a single
-              // one. Remove the first tab's close button immediately (if needed)
-              // rather than after the tabclose animation ends.
-              this.tabContainer.adjustTabstrip();
-            }
-
             setTimeout(function (tab, tabbrowser) {
               if (tab.parentNode &&
                   window.getComputedStyle(tab).maxWidth == "0.1px") {
@@ -1969,6 +1968,7 @@
 
             if (browser.registeredOpenURI && !aTabWillBeMoved) {
               this._placesAutocomplete.unregisterOpenPage(browser.registeredOpenURI);
+              this._unifiedComplete.unregisterOpenPage(browser.registeredOpenURI);
               delete browser.registeredOpenURI;
             }
 
@@ -2295,6 +2295,7 @@
             // If the current URI is registered as open remove it from the list.
             if (aOurBrowser.registeredOpenURI) {
               this._placesAutocomplete.unregisterOpenPage(aOurBrowser.registeredOpenURI);
+              this._unifiedComplete.unregisterOpenPage(aOurBrowser.registeredOpenURI);
               delete aOurBrowser.registeredOpenURI;
             }
 
@@ -3104,6 +3105,7 @@
             let browser = this.getBrowserAtIndex(i);
             if (browser.registeredOpenURI) {
               this._placesAutocomplete.unregisterOpenPage(browser.registeredOpenURI);
+              this._unifiedComplete.unregisterOpenPage(browser.registeredOpenURI);
               delete browser.registeredOpenURI;
             }
             browser.webProgress.removeProgressListener(this.mTabFilters[i]);

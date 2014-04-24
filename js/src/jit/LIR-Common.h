@@ -5497,14 +5497,16 @@ class LMonitorTypes : public LInstructionHelper<0, BOX_PIECES, 1>
 };
 
 // Generational write barrier used when writing an object to another object.
-class LPostWriteBarrierO : public LInstructionHelper<0, 2, 0>
+class LPostWriteBarrierO : public LInstructionHelper<0, 2, 1>
 {
   public:
     LIR_HEADER(PostWriteBarrierO)
 
-    LPostWriteBarrierO(const LAllocation &obj, const LAllocation &value) {
+    LPostWriteBarrierO(const LAllocation &obj, const LAllocation &value,
+                       const LDefinition &temp) {
         setOperand(0, obj);
         setOperand(1, value);
+        setTemp(0, temp);
     }
 
     const MPostWriteBarrier *mir() const {
@@ -5515,6 +5517,9 @@ class LPostWriteBarrierO : public LInstructionHelper<0, 2, 0>
     }
     const LAllocation *value() {
         return getOperand(1);
+    }
+    const LDefinition *temp() {
+        return getTemp(0);
     }
 };
 
@@ -5582,13 +5587,11 @@ class MPhi;
 // corresponding to the predecessor taken in the control flow graph.
 class LPhi MOZ_FINAL : public LInstruction
 {
-    uint32_t numInputs_;
     LAllocation *inputs_;
     LDefinition def_;
 
-    bool init(MIRGenerator *gen);
-
-    LPhi(MPhi *mir);
+    LPhi()
+    { }
 
   public:
     LIR_HEADER(Phi)
@@ -5607,7 +5610,7 @@ class LPhi MOZ_FINAL : public LInstruction
         def_ = def;
     }
     size_t numOperands() const {
-        return numInputs_;
+        return mir_->toPhi()->numOperands();
     }
     LAllocation *getOperand(size_t index) {
         JS_ASSERT(index < numOperands());

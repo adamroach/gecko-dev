@@ -163,6 +163,9 @@ public:
   // Get the scroll range assuming the scrollport has size (aWidth, aHeight).
   nsRect GetScrollRange(nscoord aWidth, nscoord aHeight) const;
   nsSize GetScrollPositionClampingScrollPortSize() const;
+  gfxSize GetResolution() const;
+  void SetResolution(const gfxSize& aResolution);
+
 protected:
   nsRect GetScrollRangeForClamping() const;
 
@@ -207,7 +210,7 @@ public:
   nsSize GetLineScrollAmount() const;
   nsSize GetPageScrollAmount() const;
 
-  nsPresState* SaveState();
+  nsPresState* SaveState() const;
   void RestoreState(nsPresState* aState);
 
   nsIFrame* GetScrolledFrame() const { return mScrolledFrame; }
@@ -308,6 +311,7 @@ public:
       mOriginOfLastScroll = nullptr;
     }
   }
+  bool WantAsyncScroll() const;
 
   // owning references to the nsIAnonymousContentCreator-built content
   nsCOMPtr<nsIContent> mHScrollbarContent;
@@ -346,6 +350,9 @@ public:
   // 0,0 when this is a new frame. Set to -1,-1 once we've scrolled for any reason
   // other than trying to restore mRestorePos.
   nsPoint mLastPos;
+
+  // The current resolution derived from the zoom level and device pixel ratio.
+  gfxSize mResolution;
 
   nsExpirationState mActivityExpirationState;
 
@@ -576,6 +583,12 @@ public:
   virtual nsSize GetScrollPositionClampingScrollPortSize() const MOZ_OVERRIDE {
     return mHelper.GetScrollPositionClampingScrollPortSize();
   }
+  virtual gfxSize GetResolution() const MOZ_OVERRIDE {
+    return mHelper.GetResolution();
+  }
+  virtual void SetResolution(const gfxSize& aResolution) MOZ_OVERRIDE {
+    return mHelper.SetResolution(aResolution);
+  }
   virtual nsSize GetLineScrollAmount() const MOZ_OVERRIDE {
     return mHelper.GetLineScrollAmount();
   }
@@ -660,6 +673,9 @@ public:
   }
   virtual void ResetOriginIfScrollAtGeneration(uint32_t aGeneration) MOZ_OVERRIDE {
     mHelper.ResetOriginIfScrollAtGeneration(aGeneration);
+  }
+  virtual bool WantAsyncScroll() const MOZ_OVERRIDE {
+    return mHelper.WantAsyncScroll();
   }
 
   // nsIStatefulFrame
@@ -883,6 +899,12 @@ public:
   virtual nsSize GetScrollPositionClampingScrollPortSize() const MOZ_OVERRIDE {
     return mHelper.GetScrollPositionClampingScrollPortSize();
   }
+  virtual gfxSize GetResolution() const MOZ_OVERRIDE {
+    return mHelper.GetResolution();
+  }
+  virtual void SetResolution(const gfxSize& aResolution) MOZ_OVERRIDE {
+    return mHelper.SetResolution(aResolution);
+  }
   virtual nsSize GetLineScrollAmount() const MOZ_OVERRIDE {
     return mHelper.GetLineScrollAmount();
   }
@@ -964,6 +986,9 @@ public:
   }
   virtual void ResetOriginIfScrollAtGeneration(uint32_t aGeneration) MOZ_OVERRIDE {
     mHelper.ResetOriginIfScrollAtGeneration(aGeneration);
+  }
+  virtual bool WantAsyncScroll() const MOZ_OVERRIDE {
+    return mHelper.WantAsyncScroll();
   }
 
   // nsIStatefulFrame

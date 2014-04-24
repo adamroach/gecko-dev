@@ -457,6 +457,9 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         movq(rhs, ScratchReg);
         cmpq(lhs, ScratchReg);
     }
+    void cmpPtr(const Register &lhs, const Imm32 rhs) {
+        cmpq(lhs, rhs);
+    }
     void cmpPtr(const Operand &lhs, const ImmGCPtr rhs) {
         movq(rhs, ScratchReg);
         cmpq(lhs, ScratchReg);
@@ -503,9 +506,6 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         cmpPtr(lhs, rhs);
         emitSet(cond, dest);
     }
-
-    Condition testNegativeZero(const FloatRegister &reg, const Register &scratch);
-    Condition testNegativeZeroFloat32(const FloatRegister &reg, const Register &scratch);
 
     /////////////////////////////////////////////////////////////////
     // Common interface.
@@ -1322,6 +1322,10 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         storeValue(JSVAL_TYPE_INT32, ScratchReg, Dest);
     }
 
+#ifdef JSGC_GENERATIONAL
+    void branchPtrInNurseryRange(Register ptr, Register temp, Label *label);
+    void branchValueIsNurseryObject(ValueOperand value, Register temp, Label *label);
+#endif
 };
 
 typedef MacroAssemblerX64 MacroAssemblerSpecific;

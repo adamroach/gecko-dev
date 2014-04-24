@@ -23,7 +23,6 @@
 #include "jit/CodeGenerator.h"
 #include "jit/EdgeCaseAnalysis.h"
 #include "jit/EffectiveAddressAnalysis.h"
-#include "jit/ExecutionModeInlines.h"
 #include "jit/IonAnalysis.h"
 #include "jit/IonBuilder.h"
 #include "jit/IonOptimizationLevels.h"
@@ -47,6 +46,8 @@
 #include "jsgcinlines.h"
 #include "jsinferinlines.h"
 #include "jsobjinlines.h"
+
+#include "jit/ExecutionMode-inl.h"
 
 using namespace js;
 using namespace js::jit;
@@ -564,8 +565,8 @@ FinishAllOffThreadCompilations(JSCompartment *comp)
 /* static */ void
 JitRuntime::Mark(JSTracer *trc)
 {
-    JS_ASSERT(!trc->runtime->isHeapMinorCollecting());
-    Zone *zone = trc->runtime->atomsCompartment()->zone();
+    JS_ASSERT(!trc->runtime()->isHeapMinorCollecting());
+    Zone *zone = trc->runtime()->atomsCompartment()->zone();
     for (gc::CellIterUnderGC i(zone, gc::FINALIZE_JITCODE); !i.done(); i.next()) {
         JitCode *code = i.get<JitCode>();
         MarkJitCodeRoot(trc, &code, "wrapper");
@@ -578,12 +579,12 @@ JitCompartment::mark(JSTracer *trc, JSCompartment *compartment)
     // Cancel any active or pending off thread compilations. Note that the
     // MIR graph does not hold any nursery pointers, so there's no need to
     // do this for minor GCs.
-    JS_ASSERT(!trc->runtime->isHeapMinorCollecting());
+    JS_ASSERT(!trc->runtime()->isHeapMinorCollecting());
     CancelOffThreadIonCompile(compartment, nullptr);
     FinishAllOffThreadCompilations(compartment);
 
     // Free temporary OSR buffer.
-    trc->runtime->jitRuntime()->freeOsrTempData();
+    trc->runtime()->jitRuntime()->freeOsrTempData();
 
     // Mark scripts with parallel IonScripts if we should preserve them.
     if (activeParallelEntryScripts_) {
@@ -606,7 +607,7 @@ JitCompartment::mark(JSTracer *trc, JSCompartment *compartment)
             // Subtlety: We depend on the tracing of the parallel IonScript's
             // callTargetEntries to propagate the parallel age to the entire
             // call graph.
-            if (ShouldPreserveParallelJITCode(trc->runtime, script, /* increase = */ true)) {
+            if (ShouldPreserveParallelJITCode(trc->runtime(), script, /* increase = */ true)) {
                 MarkScript(trc, const_cast<EncapsulatedPtrScript *>(&e.front()), "par-script");
                 MOZ_ASSERT(script == e.front());
             }
@@ -1257,7 +1258,7 @@ OptimizeMIR(MIRGenerator *mir)
     if (GetIonContext()->runtime->onMainThread())
         logger = TraceLoggerForMainThread(GetIonContext()->runtime);
     else
-        logger = TraceLoggerForThread(PR_GetCurrentThread());
+        logger = TraceLoggerForCurrentThread();
 
     if (!mir->compilingAsmJS()) {
         if (!MakeMRegExpHoistable(graph))
@@ -2513,7 +2514,7 @@ InvalidateActivation(FreeOp *fop, uint8_t *ionTop, bool invalidateAll)
 
     size_t frameno = 1;
 
-    for (IonFrameIterator it(ionTop, SequentialExecution); !it.done(); ++it, ++frameno) {
+    for (JitFrameIterator it(ionTop, SequentialExecution); !it.done(); ++it, ++frameno) {
         JS_ASSERT_IF(frameno == 1, it.type() == JitFrame_Exit);
 
 #ifdef DEBUG
@@ -2803,7 +2804,11 @@ static void
 FinishInvalidationOf(FreeOp *fop, JSScript *script, IonScript *ionScript)
 {
     types::TypeZone &types = script->zone()->types;
-    ionScript->recompileInfo().compilerOutput(types)->invalidate();
+
+    // Note: If the script is about to be swept, the compiler output may have
+    // already been destroyed.
+    if (types::CompilerOutput *output = ionScript->recompileInfo().compilerOutput(types))
+        output->invalidate();
 
     // If this script has Ion code on the stack, invalidated() will return
     // true. In this case we have to wait until destroying it.
@@ -2875,7 +2880,7 @@ jit::ForbidCompilation(JSContext *cx, JSScript *script, ExecutionMode mode)
       case SequentialExecution:
         if (script->hasIonScript()) {
             // It is only safe to modify script->ion if the script is not currently
-            // running, because IonFrameIterator needs to tell what ionScript to
+            // running, because JitFrameIterator needs to tell what ionScript to
             // use (either the one on the JSScript, or the one hidden in the
             // breadcrumbs Invalidation() leaves). Therefore, if invalidation
             // fails, we cannot disable the script.
@@ -3011,9 +3016,6 @@ AutoDebugModeInvalidation::~AutoDebugModeInvalidation()
     if (needInvalidation_ == NoNeed)
         return;
 
-    // Invalidate the stack if any compartments toggled from on->off, because
-    // we allow scripts to be on stack when turning off debug mode.
-    bool invalidateStack = needInvalidation_ == ToggledOff;
     Zone *zone = zone_ ? zone_ : comp_->zone();
     JSRuntime *rt = zone->runtimeFromMainThread();
     FreeOp *fop = rt->defaultFreeOp();
@@ -3025,31 +3027,24 @@ AutoDebugModeInvalidation::~AutoDebugModeInvalidation()
             StopAllOffThreadCompilations(comp);
     }
 
-    if (invalidateStack) {
-        jit::MarkActiveBaselineScripts(zone);
+    jit::MarkActiveBaselineScripts(zone);
 
-        for (JitActivationIterator iter(rt); !iter.done(); ++iter) {
-            JSCompartment *comp = iter.activation()->compartment();
-            if ((comp_ && comp_ == comp) ||
-                (zone_ && zone_ == comp->zone() && comp->principals))
-            {
-                IonContext ictx(CompileRuntime::get(rt));
-                AutoFlushCache afc("AutoDebugModeInvalidation", rt->jitRuntime());
-                IonSpew(IonSpew_Invalidate, "Invalidating frames for debug mode toggle");
-                InvalidateActivation(fop, iter.jitTop(), true);
-            }
+    for (JitActivationIterator iter(rt); !iter.done(); ++iter) {
+        JSCompartment *comp = iter.activation()->compartment();
+        if ((comp_ && comp_ == comp) || (zone_ && zone_ == comp->zone())) {
+            IonContext ictx(CompileRuntime::get(rt));
+            AutoFlushCache afc("AutoDebugModeInvalidation", rt->jitRuntime());
+            IonSpew(IonSpew_Invalidate, "Invalidating frames for debug mode toggle");
+            InvalidateActivation(fop, iter.jitTop(), true);
         }
     }
 
     for (gc::CellIter i(zone, gc::FINALIZE_SCRIPT); !i.done(); i.next()) {
         JSScript *script = i.get<JSScript>();
-        if ((comp_ && script->compartment() == comp_) ||
-            (zone_ && script->compartment()->principals))
-        {
+        if ((comp_ && script->compartment() == comp_) || zone_) {
             FinishInvalidation<SequentialExecution>(fop, script);
             FinishInvalidation<ParallelExecution>(fop, script);
             FinishDiscardBaselineScript(fop, script);
-            // script->clearAnalysis();
             script->resetUseCount();
         } else if (script->hasBaselineScript()) {
             script->baselineScript()->resetActive();

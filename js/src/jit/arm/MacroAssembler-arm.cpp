@@ -365,7 +365,7 @@ MacroAssemblerARM::ma_alu(Register src1, Imm32 imm, Register dest,
 
     // And try with its negative.
     if (negOp != op_invalid &&
-        alu_dbl(src1, negImm, dest, negOp, sc, c))
+        alu_dbl(src1, negImm, negDest, negOp, sc, c))
         return;
 
     // Well, damn. We can use two 16 bit mov's, then do the op
@@ -2520,6 +2520,12 @@ MacroAssemblerARMCompat::cmpPtr(const Register &lhs, const ImmGCPtr &rhs)
 }
 
 void
+MacroAssemblerARMCompat::cmpPtr(const Register &lhs, const Imm32 &rhs)
+{
+    ma_cmp(lhs, rhs);
+}
+
+void
 MacroAssemblerARMCompat::cmpPtr(const Address &lhs, const Register &rhs)
 {
     loadPtr(lhs, ScratchRegister);
@@ -4328,3 +4334,29 @@ MacroAssemblerARMCompat::jumpWithPatch(RepatchLabel *label, Condition cond)
     return ret;
 }
 
+#ifdef JSGC_GENERATIONAL
+
+void
+MacroAssemblerARMCompat::branchPtrInNurseryRange(Register ptr, Register temp, Label *label)
+{
+    JS_ASSERT(ptr != temp);
+    JS_ASSERT(ptr != ScratchRegister);
+
+    const Nursery &nursery = GetIonContext()->runtime->gcNursery();
+    movePtr(ImmWord(-ptrdiff_t(nursery.start())), ScratchRegister);
+    addPtr(ptr, ScratchRegister);
+    branchPtr(Assembler::Below, ScratchRegister, Imm32(Nursery::NurserySize), label);
+}
+
+void
+MacroAssemblerARMCompat::branchValueIsNurseryObject(ValueOperand value, Register temp, Label *label)
+{
+    Label done;
+
+    branchTestObject(Assembler::NotEqual, value, &done);
+    branchPtrInNurseryRange(value.payloadReg(), temp, label);
+
+    bind(&done);
+}
+
+#endif

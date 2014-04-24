@@ -23,6 +23,7 @@
 #include "jsutil.h"
 
 #include "ds/Sort.h"
+#include "gc/Heap.h"
 #include "vm/ArgumentsObject.h"
 #include "vm/ForkJoin.h"
 #include "vm/Interpreter.h"
@@ -2444,10 +2445,6 @@ array_splice(JSContext *cx, unsigned argc, Value *vp)
 
             /* Steps 12(c)-(d). */
             obj->shrinkElements(cx, finalLength);
-
-            /* Fix running enumerators for the deleted items. */
-            if (!js_SuppressDeletedElements(cx, obj, finalLength, len))
-                return false;
         } else {
             /*
              * This is all very slow if the length is very large. We don't yet
