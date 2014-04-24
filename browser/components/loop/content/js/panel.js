@@ -10,7 +10,7 @@ var loop = loop || {};
 loop.panel = (function(_, mozL10n) {
   "use strict";
 
-  var baseServerUrl = Services.prefs.getCharPref("loop.server"),
+  var baseServerUrl = "http://localhost:5000",
       sharedViews = loop.shared.views,
       // aliasing translation function as __ for concision
       __ = mozL10n.get;
