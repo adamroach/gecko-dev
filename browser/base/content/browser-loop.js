@@ -6,6 +6,7 @@
 let LoopUI;
 
 XPCOMUtils.defineLazyModuleGetter(this, "injectLoopAPI", "resource:///modules/loop/MozLoopAPI.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "MozLoopService", "resource:///modules/loop/MozLoopService.jsm");
 
 
 (function() {
@@ -34,6 +35,20 @@ XPCOMUtils.defineLazyModuleGetter(this, "injectLoopAPI", "resource:///modules/lo
       iframe.setAttribute("src", "about:looppanel");
       panel.hidden = false;
       panel.openPopup(anchor, "bottomcenter topright", 0, 0, false, false);
+    },
+
+    initialize: function() {
+      var observer = function observer(sbject, topic, data) {
+        if (topic == "browser-delayed-startup-finished") {
+          MozLoopService.initialize();
+          Services.obs.removeObserver(observer, "browser-delayed-startup-finished");
+        }
+      };
+      Services.obs.addObserver(observer,
+                               "browser-delayed-startup-finished", false);
     }
+
   }
+
+  LoopUI.initialize();
 })();

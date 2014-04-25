@@ -9,8 +9,79 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 this.EXPORTED_SYMBOLS = ["MozLoopService"];
 
+XPCOMUtils.defineLazyModuleGetter(this, "injectLoopAPI", "resource:///modules/loop/MozLoopAPI.jsm");
+// We steal a few things from Social - XXX - do something better here.
+XPCOMUtils.defineLazyModuleGetter(this, "findChromeWindowForChats", "resource://gre/modules/MozSocialAPI.jsm");
+
+// XXX This is a workaround for not having push notifications on desktop.
+let PushHandlerHack = {
+  pushServerUri: "wss://push.services.mozilla.com/",
+  channelID: "8b1081ce-9b35-42b5-b8f5-3ff8cb813a50",
+
+  initialize: function() {
+    this.websocket = Cc["@mozilla.org/network/protocol;1?name=wss"]
+                       .createInstance(Ci.nsIWebSocketChannel);
+
+    this.websocket.protocol = "push-notification";
+
+    var pushURI = Services.io.newURI(this.pushServerUri, null, null);
+    this.websocket.asyncOpen(pushURI, this.pushServerUri, this, null);
+  },
+
+  onStart: function() {
+    var helloMsg = { messageType: "hello", uaid: "", channelIDs: [] };
+    this.websocket.sendMsg(JSON.stringify(helloMsg));
+  },
+
+  onStop: function() {
+    Cu.reportError("Loop Push server web socket closed!");
+  },
+
+  onServerClose: function() {
+    Cu.reportError("Loop Push server web socket closed (server)!");
+  },
+
+  onMessageAvailable: function(e, message) {
+    var msg = JSON.parse(message);
+
+    switch(msg.messageType) {
+      case "hello":
+        this.websocket.sendMsg(JSON.stringify({
+          messageType: "register",
+          channelID: this.channelID
+        }));
+        break;
+      case "register":
+        this.registerXhr = Cc["@mozilla.org/xmlextras/xmlhttprequest;1"]
+                             .createInstance(Ci.nsIXMLHttpRequest);
+
+        Cu.reportError(msg.pushEndpoint);
+        // XXX Sync!
+        this.registerXhr.open('POST', MozLoopServiceInternal.loopServerUri + "/registration",
+                              false);
+        this.registerXhr.setRequestHeader('Content-Type', 'application/json');
+        this.registerXhr.channel.loadFlags = Ci.nsIChannel.INHIBIT_CACHING
+                                           | Ci.nsIChannel.LOAD_BYPASS_CACHE
+                                           | Ci.nsIChannel.LOAD_EXPLICIT_CREDENTIALS;
+        this.registerXhr.sendAsBinary(JSON.stringify({
+          simple_push_url: msg.pushEndpoint
+        }));
+        break;
+      case "notification":
+        msg.updates.forEach(function(update) {
+          if (update.channelID === this.channelID) {
+            MozLoopServiceInternal.handleNotification(update.version)
+          }
+        }.bind(this));
+        break;
+    }
+  }
+}
+
 // Internal helper methods and state
 let MozLoopServiceInternal = {
+  loopServerUri: Services.prefs.getCharPref("loop.server"),
+
   get localizedStrings() {
     var stringBundle =
       Services.strings.createBundle('chrome://browser/locale/loop/loop.properties');
@@ -32,12 +103,46 @@ let MozLoopServiceInternal = {
 
     delete this.localizedStrings;
     return this.localizedStrings = map;
+  },
+
+  handleNotification: function(version) {
+    this.openChatWindow(null, "LooP", "about:loopconversation#start/" + version);
+  },
+
+  openChatWindow: function(contentWindow, title, url, callback, mode) {
+    // So I guess the origin is the loop server!?
+    let origin = this.loopServerUri;
+    let targetWindow = findChromeWindowForChats(contentWindow);
+    url = url.spec || url;
+    // The callback is a good opportunity to inject the API
+    let thisCallback = function(chatWindow) {
+      injectLoopAPI(chatWindow);
+      if (callback) {
+        callback(chatWindow);
+      }
+    }
+    if (!targetWindow.SocialChatBar.openChat(origin, title, url, thisCallback, mode)) {
+      Cu.reportError("Failed to open a social chat window - the chatbar is not available in the target window.");
+      return;
+    }
+    // getAttention is ignored if the target window is already foreground, so
+    // we can call it unconditionally.
+    targetWindow.getAttention();
   }
 };
 
 
 // Public API
 this.MozLoopService = {
+  initialize: function() {
+    if (MozLoopServiceInternal.initialized)
+      return;
+
+    PushHandlerHack.initialize();
+
+    MozLoopServiceInternal.initialized = true;
+  },
+
   getStrings: function(key) {
     try {
       return JSON.stringify(MozLoopServiceInternal.localizedStrings[key]);
