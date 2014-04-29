@@ -9,8 +9,16 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 this.EXPORTED_SYMBOLS = ["MozLoopService"];
 
-// Internal helper methods and state
+/**
+ * Internal helper methods and state
+ */
 let MozLoopServiceInternal = {
+  /**
+   * A getter to obtain and store the strings for loop. This is structured
+   * for use by l10n.js.
+   *
+   * @returns {Object} a map of element ids with attributes to set.
+   */
   get localizedStrings() {
     var stringBundle =
       Services.strings.createBundle('chrome://browser/locale/loop/loop.properties');
@@ -36,17 +44,33 @@ let MozLoopServiceInternal = {
 };
 
 
-// Public API
+/**
+ * Public API
+ */
 this.MozLoopService = {
+  /**
+   * Returns the strings for the specified element. Designed for use
+   * with l10n.js.
+   *
+   * @param {key} The element id to get strings for.
+   * @return {String} A JSON string containing the localized
+   *                  attribute/value pairs for the element.
+   */
   getStrings: function(key) {
-    try {
-      return JSON.stringify(MozLoopServiceInternal.localizedStrings[key]);
-    } catch (ex) {
-      Cu.reportError('Unable to retrive localized strings: ' + e);
-      return null;
-    }
+      var stringData = MozLoopServiceInternal.localizedStrings;
+      if (!(key in stringData)) {
+        Cu.reportError('No string for key: ' + key + 'found');
+        return "";
+      }
+
+      return JSON.stringify(stringData[key]);
   },
 
+  /**
+   * Returns the current locale
+   *
+   * @return {String} The code of the current locale.
+   */
   get locale() {
     try {
       return Services.prefs.getComplexValue("general.useragent.locale",
