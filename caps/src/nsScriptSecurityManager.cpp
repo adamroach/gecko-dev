@@ -359,23 +359,12 @@ nsScriptSecurityManager::GetChannelPrincipal(nsIChannel* aChannel,
     nsCOMPtr<nsIURI> uri;
     nsAutoCString uriSpec;
 
-
     nsresult rv = aChannel->GetURI(getter_AddRefs(uri));
     NS_ENSURE_SUCCESS(rv, rv);
 
-    rv = static_cast<nsSimpleURI *>(uri.get())->GetAsciiSpec(uriSpec);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    fprintf(stderr, "channel uri: %s\n", uriSpec.get());
-    uriSpec = "";
 
     rv = NS_GetFinalChannelURI(aChannel, getter_AddRefs(uri));
     NS_ENSURE_SUCCESS(rv, rv);
-
-    rv = static_cast<nsSimpleURI *>(uri.get())->GetAsciiSpec(uriSpec);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    fprintf(stderr, "final uri: %s\n", uriSpec.get());
 
     nsCOMPtr<nsIDocShell> docShell;
     NS_QueryNotificationCallbacks(aChannel, docShell);
