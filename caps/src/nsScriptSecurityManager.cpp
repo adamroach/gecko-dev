@@ -279,9 +279,9 @@ nsScriptSecurityManager::SecurityHashURI(nsIURI* aURI)
     return NS_SecurityHashURI(aURI);
 }
 
-struct OverrideEntry {
-    const char *uriToOverride;
-    const char *uriForPrincipal;
+struct ExpansionEntry {
+    const char *uriForExpandedPrincipal;
+    const char *uriToAdd;
 };
 
 // linearly searched for now; if this grows much, we'll likely want to
@@ -291,28 +291,28 @@ struct OverrideEntry {
 // loop.server pref
 //
 // XXX these should really be https URLs, but our https server isn't up yet...
-static OverrideEntry kOverrideMap[] = {
+static ExpansionEntry kExpansionMap[] = {
     { "about:looppanel", "http://loop.dev.mozaws.net" },
     { "about:loopconversation", "http://loop.dev.mozaws.net" }
 };
 
 nsresult
-nsScriptSecurityManager::GetOverrideURI(nsIURI *aURI,
-                                        nsIURI **aURIForPrincipal) {
+nsScriptSecurityManager::GetExpansionURI(nsIURI *aURI,
+                                         nsIURI **aURIToAdd) {
     // XXX audit all NS_ENSURE_* for cleanups
     
     nsresult rv;
     
     uint32_t i;
-    for (i = 0; i < sizeof kOverrideMap; i++) {
+    for (i = 0; i < sizeof kExpansionMap; i++) {
 
         // XXX these objects should be created once in ::Init, not every time
         // through this loop
-        nsCOMPtr<nsIURI> uriToOverride, uriForPrincipal;
+        nsCOMPtr<nsIURI> uriForExpandedPrincipal, uriToAdd;
         
-        rv = sIOService->NewURI(nsDependentCString(kOverrideMap[i].uriToOverride),
+        rv = sIOService->NewURI(nsDependentCString(kExpansionMap[i].uriForExpandedPrincipal),
                                 nullptr, nullptr,
-                                getter_AddRefs(uriToOverride));
+                                getter_AddRefs(uriForExpandedPrincipal));
         // XXX NS_ENSURE_SUCCESS(rv, rv) spews lots of errors, inexplicably.
         // It should be put back and that should be debugged.
         if (NS_FAILED(rv))
@@ -320,21 +320,21 @@ nsScriptSecurityManager::GetOverrideURI(nsIURI *aURI,
 
         // XXX should this somehow be combined or exchanged with SubsumesExcept?
         bool urisAreEqual;
-        rv = uriToOverride->EqualsExceptRef(aURI, &urisAreEqual);
+        rv = uriForExpandedPrincipal->EqualsExceptRef(aURI, &urisAreEqual);
         NS_ENSURE_SUCCESS(rv, rv);
         
         if (urisAreEqual) {
-            rv = sIOService->NewURI(nsDependentCString(kOverrideMap[i].uriForPrincipal),
-                                    nullptr, nullptr, getter_AddRefs(uriForPrincipal));
+            rv = sIOService->NewURI(nsDependentCString(kExpansionMap[i].uriToAdd),
+                                    nullptr, nullptr, getter_AddRefs(uriToAdd));
             NS_ENSURE_SUCCESS(rv, rv);
             
             
-            NS_IF_ADDREF(*aURIForPrincipal = uriForPrincipal);
+            NS_IF_ADDREF(*aURIToAdd = uriToAdd);
             return NS_OK;
         }
     }
     
-    *aURIForPrincipal = nullptr;
+    *aURIToAdd = nullptr;
     return NS_ERROR_FAILURE;;
 }
 
@@ -1172,17 +1172,39 @@ nsScriptSecurityManager::GetCodebasePrincipalInternal(nsIURI *aURI,
         return CallCreateInstance(NS_NULLPRINCIPAL_CONTRACTID, result);
     }
 
-    nsCOMPtr<nsIURI> overrideURI;
-    rv = GetOverrideURI(aURI, getter_AddRefs(overrideURI));
-    // XXX ignored
+
     
     nsCOMPtr<nsIPrincipal> principal;
-    rv = CreateCodebasePrincipal(overrideURI.get() ? overrideURI.get() : aURI,
+    rv = CreateCodebasePrincipal(aURI,
                                  aAppId, aInMozBrowser,
                                  getter_AddRefs(principal));
     NS_ENSURE_SUCCESS(rv, rv);
     NS_IF_ADDREF(*result = principal);
 
+    nsCOMPtr<nsIURI> expansionURI;
+    rv = GetExpansionURI(aURI, getter_AddRefs(expansionURI));
+    // XXX known failures here
+
+    if (NS_SUCCEEDED(rv) && expansionURI) {
+        fprintf(stderr, "in expansionRUI if\n");
+        // Use an nsExpandedPrincipal to create asymmetric security.
+        nsCOMPtr<nsIExpandedPrincipal> ep;
+        MOZ_ASSERT(!(ep = do_QueryInterface(principal)));
+        nsTArray< nsCOMPtr<nsIPrincipal> > principalAsArray(2);
+        principalAsArray.AppendElement(principal);
+
+        nsCOMPtr<nsIPrincipal> principal2;
+        rv = CreateCodebasePrincipal(expansionURI,
+                                     aAppId, aInMozBrowser,
+                                     getter_AddRefs(principal2));
+        NS_ENSURE_SUCCESS(rv, rv);
+        NS_IF_ADDREF(*result = principal2); // XXX leakage?
+        principalAsArray.AppendElement(principal2);
+        
+        ep = new nsExpandedPrincipal(principalAsArray);
+        NS_IF_ADDREF(ep); // XXX this will leak!  who should own?
+    }
+    
     return NS_OK;
 }
 

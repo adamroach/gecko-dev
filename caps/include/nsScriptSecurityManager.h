@@ -132,7 +132,7 @@ private:
     CreateCodebasePrincipal(nsIURI* aURI, uint32_t aAppId, bool aInMozBrowser,
                             nsIPrincipal** result);
 
-    nsresult GetOverrideURI(nsIURI *aURI, nsIURI **aURIForPrincipal);
+    nsresult GetExpansionURI(nsIURI *aURI, nsIURI **aURIToAdd);
 
     // Returns null if a principal cannot be found.  Note that rv can be NS_OK
     // when this happens -- this means that there was no script for the
