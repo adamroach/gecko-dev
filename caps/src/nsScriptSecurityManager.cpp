@@ -357,13 +357,7 @@ nsScriptSecurityManager::GetChannelPrincipal(nsIChannel* aChannel,
     // OK, get the principal from the URI.  Make sure this does the same thing
     // as nsDocument::Reset and XULDocument::StartDocumentLoad.
     nsCOMPtr<nsIURI> uri;
-    nsAutoCString uriSpec;
-
-    nsresult rv = aChannel->GetURI(getter_AddRefs(uri));
-    NS_ENSURE_SUCCESS(rv, rv);
-
-
-    rv = NS_GetFinalChannelURI(aChannel, getter_AddRefs(uri));
+    nsresult rv = NS_GetFinalChannelURI(aChannel, getter_AddRefs(uri));
     NS_ENSURE_SUCCESS(rv, rv);
 
     nsCOMPtr<nsIDocShell> docShell;
