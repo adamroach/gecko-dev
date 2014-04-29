@@ -70,7 +70,7 @@ let PushHandlerHack = {
       case "notification":
         msg.updates.forEach(function(update) {
           if (update.channelID === this.channelID) {
-            MozLoopServiceInternal.handleNotification(update.version)
+            MozLoopServiceInternal.handleNotification(update.version);
           }
         }.bind(this));
         break;
@@ -120,7 +120,8 @@ let MozLoopServiceInternal = {
       if (callback) {
         callback(chatWindow);
       }
-    }
+    };
+
     if (!targetWindow.SocialChatBar.openChat(origin, title, url, thisCallback, mode)) {
       Cu.reportError("Failed to open a social chat window - the chatbar is not available in the target window.");
       return;
@@ -144,12 +145,13 @@ this.MozLoopService = {
   },
 
   getStrings: function(key) {
-    try {
-      return JSON.stringify(MozLoopServiceInternal.localizedStrings[key]);
-    } catch (ex) {
-      Cu.reportError('Unable to retrive localized strings: ' + e);
-      return null;
-    }
+      var stringData = MozLoopServiceInternal.localizedStrings;
+      if (!(key in stringData)) {
+        Cu.reportError('No string for key: ' + key + 'found');
+        return "";
+      }
+
+      return JSON.stringify(stringData[key]);
   },
 
   get locale() {

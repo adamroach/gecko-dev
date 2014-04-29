@@ -8,6 +8,8 @@ JAR_MANIFESTS += ['jar.mn']
 
 JS_MODULES_PATH = 'modules/loop'
 
+XPCSHELL_TESTS_MANIFESTS += ['test/xpcshell/xpcshell.ini']
+
 EXTRA_JS_MODULES += [
     'MozLoopAPI.jsm',
     'MozLoopService.jsm',
