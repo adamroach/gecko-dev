@@ -58,6 +58,10 @@ loop.conversation = (function(OT, mozL10n) {
       "call/ended": "ended"
     },
 
+    navigate: function(to) {
+      this[this.routes[to]]();
+    },
+
     /**
      * @override {loop.shared.router.BaseConversationRouter.startCall}
      */

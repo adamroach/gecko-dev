@@ -117,6 +117,7 @@ let MozLoopServiceInternal = {
     // The callback is a good opportunity to inject the API
     let thisCallback = function(chatWindow) {
       injectLoopAPI(chatWindow);
+
       if (callback) {
         callback(chatWindow);
       }

@@ -61,4 +61,39 @@ function injectLoopAPI(targetWindow) {
     delete targetWindow.navigator.wrappedJSObject.mozLoop;
     return targetWindow.navigator.wrappedJSObject.mozLoop = contentObj;
   });
+
+  // Handle window.close correctly on the panel and chatbox.
+  handleWindowClose(targetWindow);
+}
+
+// XXX This code is taken directly from MozSocialAPI, we probably really want to share it
+function handleWindowClose(targetWindow) {
+  let dwu = targetWindow.QueryInterface(Ci.nsIInterfaceRequestor)
+              .getInterface(Ci.nsIDOMWindowUtils);
+  dwu.allowScriptsToClose();
+
+  targetWindow.addEventListener("DOMWindowClose", function _mozLoopDOMWindowClose(evt) {
+    let elt = targetWindow.QueryInterface(Ci.nsIInterfaceRequestor)
+                .getInterface(Ci.nsIWebNavigation)
+                .QueryInterface(Ci.nsIDocShell)
+                .chromeEventHandler;
+    while (elt) {
+      if (elt.localName == "panel") {
+        elt.hidePopup();
+        break;
+      } else if (elt.localName == "chatbox") {
+        elt.close();
+        break;
+      }
+      elt = elt.parentNode;
+    }
+    // preventDefault stops the default window.close() function being called,
+    // which doesn't actually close anything but causes things to get into
+    // a bad state (an internal 'closed' flag is set and debug builds start
+    // asserting as the window is used.).
+    // None of the windows we inject this API into are suitable for this
+    // default close behaviour, so even if we took no action above, we avoid
+    // the default close from doing anything.
+    evt.preventDefault();
+  }, true);
 }
