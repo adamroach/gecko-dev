@@ -318,8 +318,9 @@ nsScriptSecurityManager::GetOverrideURI(nsIURI *aURI,
         if (NS_FAILED(rv))
             return rv;
 
+        // XXX should this somehow be combined or exchanged with SubsumesExcept?
         bool urisAreEqual;
-        rv = uriToOverride->Equals(aURI, &urisAreEqual);
+        rv = uriToOverride->EqualsExceptRef(aURI, &urisAreEqual);
         NS_ENSURE_SUCCESS(rv, rv);
         
         if (urisAreEqual) {
