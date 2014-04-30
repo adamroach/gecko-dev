@@ -307,11 +307,26 @@ SocialChatBar = {
   get hasChats() {
     return !!this.chatbar.firstElementChild;
   },
-  openChat: function(aOrigin, aTitle, aURL, aCallback, aMode) {
+  openChat: function(aProvider, aURL, aCallback, aMode) {
     this.update();
     if (!this.isAvailable)
       return false;
-    this.chatbar.openChat(aOrigin, aTitle, aURL, aCallback, aMode);
+
+    let chatbox = this.chatbar.openChat(aProvider.origin, aProvider.name, aURL, aMode);
+    chatbox.promiseChatCreated.then(
+      () => {
+        // All social chat windows get a special error listener.
+        Social.setErrorListener(chatbox.content, function(aBrowser) {
+          aBrowser.webNavigation.loadURI("about:socialerror?mode=compactInfo&origin=" +
+                                 encodeURIComponent(aBrowser.getAttribute("origin")),
+                                 null, null, null, null);
+        });
+      }
+    );
+    if (aCallback) {
+      chatbox.promiseChatLoaded.then( () => aCallback(chatbox.contentWindow) );
+    }
+
     // We only want to focus the chat if it is as a result of user input.
     let dwu = window.QueryInterface(Ci.nsIInterfaceRequestor)
                     .getInterface(Ci.nsIDOMWindowUtils);

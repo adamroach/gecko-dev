@@ -334,9 +334,7 @@ this.openChatWindow =
     Cu.reportError("Failed to open a social chat window - the requested URL is not the same origin as the provider.");
     return;
   }
-  let title = provider.name;
-  let origin = provider.origin;
-  if (!chromeWindow.SocialChatBar.openChat(origin, title, fullURI.spec, callback, mode)) {
+  if (!chromeWindow.SocialChatBar.openChat(provider, fullURI.spec, callback, mode)) {
     Cu.reportError("Failed to open a social chat window - the chatbar is not available in the target window.");
     return;
   }

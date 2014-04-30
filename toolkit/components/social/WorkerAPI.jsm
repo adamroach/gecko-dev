@@ -96,8 +96,6 @@ WorkerAPI.prototype = {
       });
     },
     'social.request-chat': function(data) {
-      let title = this._provider.name;
-      let origin = this._provider.origin;
       openChatWindow(null, this._provider, data);
     },
     'social.notification-create': function(data) {

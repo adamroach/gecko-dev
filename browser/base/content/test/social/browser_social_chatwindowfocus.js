@@ -40,8 +40,7 @@ function openChatViaWorkerMessage(port, data, callback) {
                       // so the child has been added, but we don't know if it
                       // has been intialized - re-request it and the callback
                       // means it's done.  Minimized, same as the worker.
-                      SocialChatBar.openChat(SocialSidebar.provider.origin,
-                                             SocialSidebar.provider.name,
+                      SocialChatBar.openChat(SocialSidebar.provider,
                                              data,
                                              function() {
                                                 callback();
