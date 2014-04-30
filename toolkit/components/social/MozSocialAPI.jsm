@@ -279,10 +279,10 @@ function isWindowGoodForChats(win) {
          && !PrivateBrowsingUtils.isWindowPrivate(win);
 }
 
-function findChromeWindowForChats(preferredWindow) {
+function findChromeWindowForChats(preferredWindow, filterCallback) {
   if (preferredWindow) {
     preferredWindow = getChromeWindow(preferredWindow);
-    if (isWindowGoodForChats(preferredWindow)) {
+    if (filterCallback(preferredWindow)) {
       return preferredWindow;
     }
   }
@@ -296,7 +296,7 @@ function findChromeWindowForChats(preferredWindow) {
   // foreground window is a popup.
 
   let mostRecent = Services.wm.getMostRecentWindow("navigator:browser");
-  if (isWindowGoodForChats(mostRecent))
+  if (filterCallback(mostRecent))
     return mostRecent;
 
   let topMost, enumerator;
@@ -316,7 +316,7 @@ function findChromeWindowForChats(preferredWindow) {
   }
   while (enumerator.hasMoreElements()) {
     let win = enumerator.getNext();
-    if (!win.closed && isWindowGoodForChats(win))
+    if (!win.closed && filterCallback(win))
       topMost = win;
   }
   return topMost;
@@ -324,7 +324,7 @@ function findChromeWindowForChats(preferredWindow) {
 
 this.openChatWindow =
  function openChatWindow(contentWindow, provider, url, callback, mode) {
-  chromeWindow = findChromeWindowForChats(contentWindow);
+  chromeWindow = findChromeWindowForChats(contentWindow, isWindowGoodForChats);
   if (!chromeWindow) {
     Cu.reportError("Failed to open a social chat window - no host window could be found.");
     return;

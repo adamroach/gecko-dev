@@ -110,22 +110,34 @@ let MozLoopServiceInternal = {
   },
 
   openChatWindow: function(contentWindow, title, url, callback, mode) {
+    let filterCallback = function(window) {
+      // any window with a chatbar is good!
+      return !!window.document.getElementById("pinnedchats");
+    };
     // So I guess the origin is the loop server!?
     let origin = this.loopServerUri;
-    let targetWindow = findChromeWindowForChats(contentWindow);
-    url = url.spec || url;
-    // The callback is a good opportunity to inject the API
-    let thisCallback = function(chatWindow) {
-      injectLoopAPI(chatWindow);
-      if (callback) {
-        callback(chatWindow);
-      }
-    };
-
-    if (!targetWindow.SocialChatBar.openChat(origin, title, url, thisCallback, mode)) {
-      Cu.reportError("Failed to open a social chat window - the chatbar is not available in the target window.");
+    let targetWindow = findChromeWindowForChats(contentWindow, filterCallback);
+    if (!targetWindow) {
+      // XXX me might want to do something else here, like open a new
+      // navigator:browser window - later...
+      Cu.reportError("Can't find a chrome window that can host chats");
       return;
     }
+
+    url = url.spec || url;
+
+    let chatbar = targetWindow.document.getElementById("pinnedchats");
+    chatbar.hidden = false; // should really move this into openChat?
+    let chatbox = chatbar.openChat(origin, title, url, mode);
+    chatbox.promiseChatCreated.then(
+      () => {
+        let chatWindow = chatbox.contentWindow;
+        injectLoopAPI(chatWindow);
+        if (callback) {
+          callback(chatWindow);
+        }
+      }
+    );
     // getAttention is ignored if the target window is already foreground, so
     // we can call it unconditionally.
     targetWindow.getAttention();
