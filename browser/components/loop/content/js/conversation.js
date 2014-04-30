@@ -14,7 +14,7 @@ loop.conversation = (function(OT, mozL10n) {
 
   /**
    * App router.
-   * @type {loop.webapp.Router}
+   * @type {loop.desktopRouter.DesktopConversationRouter}
    */
   var router;
 
@@ -51,7 +51,7 @@ loop.conversation = (function(OT, mozL10n) {
    *
    * @type {loop.shared.router.BaseConversationRouter}
    */
-  var ConversationRouter = loop.shared.router.BaseConversationRouter.extend({
+  var ConversationRouter = loop.desktopRouter.DesktopConversationRouter.extend({
     routes: {
       "start/:version": "start",
       "call/ongoing": "conversation",

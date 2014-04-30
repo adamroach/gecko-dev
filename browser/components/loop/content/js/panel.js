@@ -14,7 +14,7 @@ loop.panel = (function(_, mozL10n) {
 
   /**
    * Panel router.
-   * @type {loop.shared.router.BaseRouter}
+   * @type {loop.desktopRouter.DesktopRouter}
    */
   var router;
 
@@ -99,7 +99,7 @@ loop.panel = (function(_, mozL10n) {
     }
   });
 
-  var PanelRouter = loop.shared.router.BaseRouter.extend({
+  var PanelRouter = loop.desktopRouter.DesktopRouter.extend({
     routes: {
       "": "home"
     },
