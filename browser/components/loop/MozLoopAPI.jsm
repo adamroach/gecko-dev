@@ -8,6 +8,9 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource:///modules/loop/MozLoopService.jsm");
 
+// We steal a few things from Social - XXX - do something better here.
+XPCOMUtils.defineLazyModuleGetter(this, "handleWindowClose", "resource://gre/modules/MozSocialAPI.jsm");
+
 this.EXPORTED_SYMBOLS = ["injectLoopAPI"];
 
 /**
@@ -61,4 +64,7 @@ function injectLoopAPI(targetWindow) {
     delete targetWindow.navigator.wrappedJSObject.mozLoop;
     return targetWindow.navigator.wrappedJSObject.mozLoop = contentObj;
   });
+
+  // Handle window.close correctly on the panel and chatbox.
+  handleWindowClose(targetWindow);
 }
