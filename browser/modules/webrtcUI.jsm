@@ -123,7 +123,10 @@ function prompt(aContentWindow, aCallID, aAudioRequested, aVideoRequested, aDevi
     return;
   }
 
-  let uri = aContentWindow.document.documentURIObject;
+  // Use the nodePrincipal rather than the documentURIObject as this works better for
+  // special (e.g. about:loop*) pages where we set the nodePrincipal to the server we're
+  // communicating with.
+  let uri = aContentWindow.document.nodePrincipal.URI;
   let browser = getBrowserForWindow(aContentWindow);
   let chromeDoc = browser.ownerDocument;
   let chromeWin = chromeDoc.defaultView;
@@ -300,7 +303,10 @@ function showBrowserSpecificIndicator(aBrowser) {
 
   let message = stringBundle.getString("getUserMedia.sharing" + captureState + ".message2");
 
-  let uri = aBrowser.contentWindow.document.documentURIObject;
+  // Use the nodePrincipal rather than the documentURIObject as this works better for
+  // special (e.g. about:loop*) pages where we set the nodePrincipal to the server we're
+  // communicating with.
+  let uri = aBrowser.contentWindow.document.nodePrincipal.URI;
   let windowId = aBrowser.contentWindow
                          .QueryInterface(Ci.nsIInterfaceRequestor)
                          .getInterface(Ci.nsIDOMWindowUtils)
