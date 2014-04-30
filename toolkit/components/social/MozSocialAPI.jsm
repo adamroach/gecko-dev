@@ -10,7 +10,10 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SocialService", "resource://gre/modules/SocialService.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils", "resource://gre/modules/PrivateBrowsingUtils.jsm");
 
-this.EXPORTED_SYMBOLS = ["MozSocialAPI", "openChatWindow", "findChromeWindowForChats", "closeAllChatWindows"];
+this.EXPORTED_SYMBOLS = [
+  "MozSocialAPI", "openChatWindow", "findChromeWindowForChats", "closeAllChatWindows",
+  "handleWindowClose"
+];
 
 this.MozSocialAPI = {
   _enabled: false,
