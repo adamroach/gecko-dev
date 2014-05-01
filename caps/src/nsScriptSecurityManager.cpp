@@ -361,6 +361,15 @@ nsScriptSecurityManager::GetChannelPrincipal(nsIChannel* aChannel,
     nsCOMPtr<nsIDocShell> docShell;
     NS_QueryNotificationCallbacks(aChannel, docShell);
 
+    nsCOMPtr<nsIURI> overrideURI;
+    rv = GetOverrideURI(uri, getter_AddRefs(overrideURI));
+    // XXX ignored
+
+    nsCOMPtr<nsIPrincipal> principal;
+    if (overrideURI.get()) {
+        uri = overrideURI;
+    }
+
     if (docShell) {
         return GetDocShellCodebasePrincipal(uri, docShell, aPrincipal);
     }
@@ -1153,13 +1162,8 @@ nsScriptSecurityManager::GetCodebasePrincipalInternal(nsIURI *aURI,
         return CallCreateInstance(NS_NULLPRINCIPAL_CONTRACTID, result);
     }
 
-    nsCOMPtr<nsIURI> overrideURI;
-    rv = GetOverrideURI(aURI, getter_AddRefs(overrideURI));
-    // XXX ignored
-
     nsCOMPtr<nsIPrincipal> principal;
-    rv = CreateCodebasePrincipal(overrideURI.get() ? overrideURI.get() : aURI,
-                                 aAppId, aInMozBrowser,
+    rv = CreateCodebasePrincipal(aURI, aAppId, aInMozBrowser,
                                  getter_AddRefs(principal));
     NS_ENSURE_SUCCESS(rv, rv);
     NS_IF_ADDREF(*result = principal);
