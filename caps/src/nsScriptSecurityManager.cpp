@@ -281,19 +281,15 @@ nsScriptSecurityManager::SecurityHashURI(nsIURI* aURI)
 
 struct OverrideEntry {
     const char *uriToOverride;
-    const char *uriForPrincipal;
+    const char *overrideUriPref;
 };
 
 // linearly searched for now; if this grows much, we'll likely want to
 // switch to binary search or even a hashtable
-//
-// XXX loop.dev.mozaws.net hardcoded for now; we really want to get this from the
-// loop.server pref
-//
-// XXX these should really be https URLs, but our https server isn't up yet...
+
 static OverrideEntry kOverrideMap[] = {
-    { "about:looppanel", "http://loop.dev.mozaws.net" },
-    { "about:loopconversation", "http://loop.dev.mozaws.net" }
+    { "about:looppanel", "loop.server" },
+    { "about:loopconversation", "loop.server" }
 };
 
 nsresult
@@ -323,8 +319,15 @@ nsScriptSecurityManager::GetOverrideURI(nsIURI *aURI,
         NS_ENSURE_SUCCESS(rv, rv);
 
         if (urisAreEqual) {
-            rv = sIOService->NewURI(nsDependentCString(kOverrideMap[i].uriForPrincipal),
-                                    nullptr, nullptr, getter_AddRefs(uriForPrincipal));
+
+            nsAdoptingCString overrideUri =
+              Preferences::GetCString(kOverrideMap[i].overrideUriPref);
+            if (!overrideUri) {
+                return NS_ERROR_FAILURE;
+            }
+
+            rv = sIOService->NewURI(overrideUri, nullptr, nullptr,
+                                    getter_AddRefs(uriForPrincipal));
             NS_ENSURE_SUCCESS(rv, rv);
 
             NS_IF_ADDREF(*aURIForPrincipal = uriForPrincipal);
