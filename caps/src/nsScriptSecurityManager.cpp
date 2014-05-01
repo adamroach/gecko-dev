@@ -336,8 +336,6 @@ nsScriptSecurityManager::GetOverrideURI(nsIURI *aURI,
     return NS_ERROR_FAILURE;;
 }
 
-#include "../../../netwerk/base/src/nsSimpleURI.h"
-
 NS_IMETHODIMP
 nsScriptSecurityManager::GetChannelPrincipal(nsIChannel* aChannel,
                                              nsIPrincipal** aPrincipal)
