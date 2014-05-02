@@ -172,7 +172,7 @@ let MozLoopServiceInternal = {
     // XXX Sync!
     // XXX need to handle and report things like DNS lookup failures
     this.registerXhr.open('POST', MozLoopServiceInternal.loopServerUri + "/registration",
-                          false);
+                          true);
     this.registerXhr.setRequestHeader('Content-Type', 'application/json');
 
     // XXX maybe do something less hacky here?  It's not yet obvious to me
@@ -185,6 +185,9 @@ let MozLoopServiceInternal = {
     this.registerXhr.channel.loadFlags = Ci.nsIChannel.INHIBIT_CACHING
       | Ci.nsIChannel.LOAD_BYPASS_CACHE
       | Ci.nsIChannel.LOAD_EXPLICIT_CREDENTIALS;
+
+    this.registerXhr.onreadystatechange = this.onRegistrationResult.bind(this);
+
     this.registerXhr.sendAsBinary(JSON.stringify({
       simple_push_url: pushUrl
     }));
@@ -198,6 +201,27 @@ let MozLoopServiceInternal = {
    */
   onHandleNotification: function(version) {
     this.openChatWindow(null, "LooP", "about:loopconversation#start/" + version);
+  },
+
+  /**
+   * Callback from the registation xhr. Checks the registration result.
+   */
+  onRegistrationResult: function() {
+    debugger;
+    if (this.registerXhr.readyState != Ci.nsIXMLHttpRequest.DONE)
+      return;
+
+    if (this.registerXhr.status != 200) {
+      // XXX Bubble this up to the UI somehow, bug 994151 will handle some of this
+      Cu.reportError("Failed to register with push server. Code: " +
+        this.registerXhr.status + " Text: " + this.registerXhr.statusText);
+      return;
+    }
+
+    // Otherwise we registered just fine.
+    // XXX For now, we'll just save this fact, bug 994151 (again) will make use of
+    // this more.
+    this.registeredLoopServer = true;
   },
 
   /**
