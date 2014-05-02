@@ -23,6 +23,8 @@ public:
   static nsresult
     Create(nsISupports *aOuter, REFNSIID aIID, void **aResult);
 
+  static nsresult
+    SetChannelOwnerFromPref(nsIChannel *aChannel, const char *aPref);
 protected:
 };
 

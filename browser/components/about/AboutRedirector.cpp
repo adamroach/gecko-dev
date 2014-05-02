@@ -130,6 +130,44 @@ GetAboutModuleName(nsIURI *aURI)
   return path;
 }
 
+nsresult
+AboutRedirector::SetChannelOwnerFromPref(nsIChannel *aChannel, const char *aPref)
+{
+    nsresult rv;
+
+    nsCOMPtr<nsIPrefBranch> prefs =
+    do_GetService(NS_PREFSERVICE_CONTRACTID, &rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    // XXX does GetCharPref support UTF-8 URIs?  Does it matter?
+    nsAutoCString overrideUriString;
+    rv = prefs->GetCharPref(aPref, getter_Copies(overrideUriString));
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    // XXX what checks should we perform on overrideURIString here?
+
+    nsCOMPtr<nsIURI> overrideUri;
+    rv = NS_NewURI(getter_AddRefs(overrideUri), overrideUriString);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    nsCOMPtr<nsIScriptSecurityManager> secMan =
+    do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID, &rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    // XXX probably don't want to default this to setting mozBrowser to true
+    // all the time
+    nsCOMPtr<nsIPrincipal> principal;
+    rv = secMan->GetAppCodebasePrincipal(overrideUri,
+                                         nsIScriptSecurityManager::NO_APP_ID,
+                                         true, getter_AddRefs(principal));
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = aChannel->SetOwner(principal);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    return NS_OK;
+}
+
 NS_IMETHODIMP
 AboutRedirector::NewChannel(nsIURI *aURI, nsIChannel **result)
 {
@@ -153,37 +191,8 @@ AboutRedirector::NewChannel(nsIURI *aURI, nsIChannel **result)
 
       if (kRedirMap[i].principalUriPref) {
 
-        // XXX add comment here about why we're using NS_ENSURE_SUCCESS
-
-        nsCOMPtr<nsIPrefBranch> prefs =
-          do_GetService(NS_PREFSERVICE_CONTRACTID, &rv);
-        NS_ENSURE_SUCCESS(rv, rv);
-
-        // XXX does GetCharPref support UTF-8 URIs?  Does it matter?
-        nsAutoCString overrideUriString;
-        rv = prefs->GetCharPref(kRedirMap[i].principalUriPref,
-                                getter_Copies(overrideUriString));
-        NS_ENSURE_SUCCESS(rv, rv);
-        // XXX what checks should we perform on overrideURIString here?
-
-        nsCOMPtr<nsIURI> overrideUri;
-        rv = ioService->NewURI(overrideUriString, nullptr, nullptr,
-                               getter_AddRefs(overrideUri));
-        NS_ENSURE_SUCCESS(rv, rv);
-
-        nsCOMPtr<nsIScriptSecurityManager> secMan =
-          do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID, &rv);
-        NS_ENSURE_SUCCESS(rv, rv);
-
-        // XXX probably don't want to default this to setting mozBrowser to true
-        // all the time
-        nsCOMPtr<nsIPrincipal> principal;
-        rv = secMan->GetAppCodebasePrincipal(overrideUri,
-          nsIScriptSecurityManager::NO_APP_ID, true,
-          getter_AddRefs(principal));
-        NS_ENSURE_SUCCESS(rv, rv);
-
-        rv = tempChannel->SetOwner(principal);
+        rv = SetChannelOwnerFromPref(tempChannel,
+                                     kRedirMap[i].principalUriPref);
         NS_ENSURE_SUCCESS(rv, rv);
 
         nsCOMPtr<nsIWritablePropertyBag2> writableBag =
