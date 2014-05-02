@@ -176,6 +176,7 @@ AboutRedirector::NewChannel(nsIURI *aURI, nsIChannel **result)
         NS_ENSURE_SUCCESS(rv, rv);
 
         // XXX probably don't want to default this to setting mozBrowser to true
+        // all the time
         nsCOMPtr<nsIPrincipal> principal;
         rv = secMan->GetAppCodebasePrincipal(overrideUri,
           nsIScriptSecurityManager::NO_APP_ID, true,
@@ -183,6 +184,28 @@ AboutRedirector::NewChannel(nsIURI *aURI, nsIChannel **result)
         NS_ENSURE_SUCCESS(rv, rv);
 
         rv = tempChannel->SetOwner(principal);
+        NS_ENSURE_SUCCESS(rv, rv);
+
+        nsCOMPtr<nsIWritablePropertyBag2> writableBag =
+          do_QueryInterface(tempChannel, &rv);
+        NS_ENSURE_SUCCESS(rv, rv);
+
+        // XXX Why can't we just call tempChannel->GetURI and use that?
+        // (doing so causes the right path to be resolved, but runs afoul of
+        // CheckLoadURI when attempting to do the sub-resource loads)
+        nsCOMPtr<nsIURI> redirectedURI;
+        rv = NS_NewURI(getter_AddRefs(redirectedURI), kRedirMap[i].url,
+                       nullptr, ioService);
+        NS_ENSURE_SUCCESS(rv, rv);
+
+        // Tells the document to use redirectedURI as the base URI for
+        // resolving relative URIs.
+        //
+        // In the case of chrome: URIs (or perhaps any protocol handler
+        // that uses nsStandardURL?) the file name portion gets sliced off the
+        // base URI before resolution.
+        rv = writableBag->SetPropertyAsInterface(NS_LITERAL_STRING("baseURI"),
+                                                 redirectedURI);
         NS_ENSURE_SUCCESS(rv, rv);
       }
 
