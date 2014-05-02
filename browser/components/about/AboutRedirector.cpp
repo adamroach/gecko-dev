@@ -9,6 +9,7 @@
 #include "nsNetUtil.h"
 #include "nsIScriptSecurityManager.h"
 #include "mozilla/ArrayUtils.h"
+#include "nsIPrefService.h"
 
 namespace mozilla {
 namespace browser {
@@ -18,6 +19,7 @@ NS_IMPL_ISUPPORTS1(AboutRedirector, nsIAboutModule)
 struct RedirEntry {
   const char* id;
   const char* url;
+  const char* principalUriPref;
   uint32_t flags;
 };
 
@@ -33,77 +35,77 @@ struct RedirEntry {
  */
 static RedirEntry kRedirMap[] = {
 #ifdef MOZ_SAFE_BROWSING
-  { "blocked", "chrome://browser/content/blockedSite.xhtml",
+  { "blocked", "chrome://browser/content/blockedSite.xhtml", nullptr,
     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
     nsIAboutModule::ALLOW_SCRIPT |
     nsIAboutModule::HIDE_FROM_ABOUTABOUT },
 #endif
   { "certerror", "chrome://browser/content/certerror/aboutCertError.xhtml",
+      nullptr,
     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
     nsIAboutModule::ALLOW_SCRIPT |
     nsIAboutModule::HIDE_FROM_ABOUTABOUT },
-  { "socialerror", "chrome://browser/content/aboutSocialError.xhtml",
+  { "socialerror", "chrome://browser/content/aboutSocialError.xhtml", nullptr,
     nsIAboutModule::ALLOW_SCRIPT |
     nsIAboutModule::HIDE_FROM_ABOUTABOUT },
-  { "tabcrashed", "chrome://browser/content/aboutTabCrashed.xhtml",
+  { "tabcrashed", "chrome://browser/content/aboutTabCrashed.xhtml", nullptr,
     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
     nsIAboutModule::ALLOW_SCRIPT |
     nsIAboutModule::HIDE_FROM_ABOUTABOUT },
-  { "feeds", "chrome://browser/content/feeds/subscribe.xhtml",
+  { "feeds", "chrome://browser/content/feeds/subscribe.xhtml", nullptr,
     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
     nsIAboutModule::ALLOW_SCRIPT |
     nsIAboutModule::HIDE_FROM_ABOUTABOUT },
   { "privatebrowsing", "chrome://browser/content/aboutPrivateBrowsing.xhtml",
-    nsIAboutModule::ALLOW_SCRIPT },
+    nullptr, nsIAboutModule::ALLOW_SCRIPT },
   { "rights",
 #ifdef MOZ_OFFICIAL_BRANDING
     "chrome://global/content/aboutRights.xhtml",
 #else
     "chrome://global/content/aboutRights-unbranded.xhtml",
 #endif
-    nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+      nullptr,
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
     nsIAboutModule::ALLOW_SCRIPT },
-  { "robots", "chrome://browser/content/aboutRobots.xhtml",
+  { "robots", "chrome://browser/content/aboutRobots.xhtml", nullptr,
     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
     nsIAboutModule::ALLOW_SCRIPT },
   { "sessionrestore", "chrome://browser/content/aboutSessionRestore.xhtml",
-    nsIAboutModule::ALLOW_SCRIPT },
-  { "welcomeback", "chrome://browser/content/aboutWelcomeBack.xhtml",
+    nullptr, nsIAboutModule::ALLOW_SCRIPT },
+  { "welcomeback", "chrome://browser/content/aboutWelcomeBack.xhtml", nullptr,
     nsIAboutModule::ALLOW_SCRIPT },
 #ifdef MOZ_SERVICES_SYNC
-  { "sync-progress", "chrome://browser/content/sync/progress.xhtml",
+  { "sync-progress", "chrome://browser/content/sync/progress.xhtml", nullptr,
     nsIAboutModule::ALLOW_SCRIPT },
-  { "sync-tabs", "chrome://browser/content/sync/aboutSyncTabs.xul",
+  { "sync-tabs", "chrome://browser/content/sync/aboutSyncTabs.xul", nullptr,
     nsIAboutModule::ALLOW_SCRIPT },
 #endif
-  { "home", "chrome://browser/content/abouthome/aboutHome.xhtml",
+  { "home", "chrome://browser/content/abouthome/aboutHome.xhtml", nullptr,
     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
     nsIAboutModule::ALLOW_SCRIPT },
-  { "newtab", "chrome://browser/content/newtab/newTab.xul",
+  { "newtab", "chrome://browser/content/newtab/newTab.xul",  nullptr,
     nsIAboutModule::ALLOW_SCRIPT },
   { "permissions", "chrome://browser/content/preferences/aboutPermissions.xul",
-    nsIAboutModule::ALLOW_SCRIPT },
+    nullptr, nsIAboutModule::ALLOW_SCRIPT },
   { "preferences", "chrome://browser/content/preferences/in-content/preferences.xul",
-    nsIAboutModule::ALLOW_SCRIPT },
+    nullptr, nsIAboutModule::ALLOW_SCRIPT },
   { "downloads", "chrome://browser/content/downloads/contentAreaDownloadsView.xul",
-    nsIAboutModule::ALLOW_SCRIPT },
+    nullptr, nsIAboutModule::ALLOW_SCRIPT },
 #ifdef MOZ_SERVICES_HEALTHREPORT
   { "healthreport", "chrome://browser/content/abouthealthreport/abouthealth.xhtml",
-    nsIAboutModule::ALLOW_SCRIPT },
+    nullptr, nsIAboutModule::ALLOW_SCRIPT },
 #endif
   { "accounts", "chrome://browser/content/aboutaccounts/aboutaccounts.xhtml",
-    nsIAboutModule::ALLOW_SCRIPT },
+    nullptr, nsIAboutModule::ALLOW_SCRIPT },
   { "app-manager", "chrome://browser/content/devtools/app-manager/index.xul",
-    nsIAboutModule::ALLOW_SCRIPT },
+    nullptr, nsIAboutModule::ALLOW_SCRIPT },
   { "customizing", "chrome://browser/content/customizableui/aboutCustomizing.xul",
-    nsIAboutModule::ALLOW_SCRIPT },
+    nullptr, nsIAboutModule::ALLOW_SCRIPT },
 #ifdef MOZ_LOOP
   { "loopconversation", "chrome://browser/content/loop/conversation.html",
-    nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
-    nsIAboutModule::ALLOW_SCRIPT |
+    "loop.server", nsIAboutModule::ALLOW_SCRIPT |
     nsIAboutModule::HIDE_FROM_ABOUTABOUT },
-  { "looppanel", "chrome://browser/content/loop/panel.html",
-    nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+  { "looppanel", "chrome://browser/content/loop/panel.html", "loop.server",
     nsIAboutModule::ALLOW_SCRIPT |
     nsIAboutModule::HIDE_FROM_ABOUTABOUT },
 #endif
@@ -148,6 +150,41 @@ AboutRedirector::NewChannel(nsIURI *aURI, nsIChannel **result)
       NS_ENSURE_SUCCESS(rv, rv);
 
       tempChannel->SetOriginalURI(aURI);
+
+      if (kRedirMap[i].principalUriPref) {
+
+        // XXX add comment here about why we're using NS_ENSURE_SUCCESS
+
+        nsCOMPtr<nsIPrefBranch> prefs =
+          do_GetService(NS_PREFSERVICE_CONTRACTID, &rv);
+        NS_ENSURE_SUCCESS(rv, rv);
+
+        // XXX does GetCharPref support UTF-8 URIs?  Does it matter?
+        nsAutoCString overrideUriString;
+        rv = prefs->GetCharPref(kRedirMap[i].principalUriPref,
+                                getter_Copies(overrideUriString));
+        NS_ENSURE_SUCCESS(rv, rv);
+        // XXX what checks should we perform on overrideURIString here?
+
+        nsCOMPtr<nsIURI> overrideUri;
+        rv = ioService->NewURI(overrideUriString, nullptr, nullptr,
+                               getter_AddRefs(overrideUri));
+        NS_ENSURE_SUCCESS(rv, rv);
+
+        nsCOMPtr<nsIScriptSecurityManager> secMan =
+          do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID, &rv);
+        NS_ENSURE_SUCCESS(rv, rv);
+
+        // XXX probably don't want to default this to setting mozBrowser to true
+        nsCOMPtr<nsIPrincipal> principal;
+        rv = secMan->GetAppCodebasePrincipal(overrideUri,
+          nsIScriptSecurityManager::NO_APP_ID, true,
+          getter_AddRefs(principal));
+        NS_ENSURE_SUCCESS(rv, rv);
+
+        rv = tempChannel->SetOwner(principal);
+        NS_ENSURE_SUCCESS(rv, rv);
+      }
 
       NS_ADDREF(*result = tempChannel);
       return rv;
