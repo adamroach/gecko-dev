@@ -17,7 +17,12 @@
 
     <script type="text/javascript" src="js/fxcom.js"></script>
     <script type="text/javascript" src="libs/l10n.js"></script>
-    <script type="text/javascript" src="shared/libs/sdk.js"></script>
+    <script type="text/javascript" src="shared/libs/sdk/sdk.js"></script>
+    <script type="text/javacript">
+      // Override these assets urls to prevent the SDK downloading them over HTTP
+      OT.properties.configURL = 'shared/libs/sdk/dynamic_config.min.js';
+      OT.properties.cssURL    = 'shared/libs/sdk/ot.min.css';
+    </script>
     <script type="text/javascript" src="shared/libs/jquery-2.1.0.js"></script>
     <script type="text/javascript" src="shared/libs/lodash-2.4.1.js"></script>
     <script type="text/javascript" src="shared/libs/backbone-1.1.2.js"></script>
