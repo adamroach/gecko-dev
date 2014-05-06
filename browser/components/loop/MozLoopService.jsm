@@ -186,6 +186,13 @@ let MozLoopServiceInternal = {
                           true);
     this.registerXhr.setRequestHeader('Content-Type', 'application/json');
 
+    // XXX maybe do something less hacky here?  It's not yet obvious to me
+    // why mozIThirdPartyUtils is labeling this cookie as foreign; going over
+    // the IDL in detail may be enough to figure that.  For now, let's unblock
+    // work.
+    this.registerXhr.channel.QueryInterface(Ci.nsIHttpChannelInternal);
+    this.registerXhr.channel.forceAllowThirdPartyCookie = true;
+
     this.registerXhr.channel.loadFlags = Ci.nsIChannel.INHIBIT_CACHING
       | Ci.nsIChannel.LOAD_BYPASS_CACHE
       | Ci.nsIChannel.LOAD_EXPLICIT_CREDENTIALS;

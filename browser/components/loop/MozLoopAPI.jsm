@@ -39,6 +39,26 @@ function injectLoopAPI(targetWindow) {
     },
 
     /**
+     * Returns the cookies received from the loop server.
+     *
+     * @return {Array} An array of objects with name/value pairs
+     */
+    cookies: {
+      enumerable: true,
+      configurable: true,
+      get: function() {
+        let host = Services.prefs.getCharPref("loop.server");
+        let cenum = Services.cookies.getCookiesFromHost(host);
+        let results = [];
+        while (cenum.hasMoreElements()) {
+          let cookie = cenum.getNext().QueryInterface(Ci.nsICookie2);
+          results.push({name: cookie.name, value: cookie.value});
+        }
+        return results;
+      }
+    },
+
+    /**
      * Returns the current locale of the browser.
      *
      * @returns {String} The locale string
