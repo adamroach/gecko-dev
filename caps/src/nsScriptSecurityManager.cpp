@@ -292,8 +292,8 @@ struct OverrideEntry {
 //
 // XXX these should really be https URLs, but our https server isn't up yet...
 static OverrideEntry kOverrideMap[] = {
-    { "about:looppanel", "http://loop.dev.mozaws.net" },
-    { "about:loopconversation", "http://loop.dev.mozaws.net" }
+    //    { "about:looppanel", "http://loop.dev.mozaws.net" },
+    //    { "about:loopconversation", "http://loop.dev.mozaws.net" }
 };
 
 nsresult
@@ -629,7 +629,7 @@ static nsresult
 DenyAccessIfURIHasFlags(nsIURI* aURI, uint32_t aURIFlags)
 {
     NS_PRECONDITION(aURI, "Must have URI!");
-    
+
     bool uriHasFlags;
     nsresult rv =
         NS_URIChainHasFlags(aURI, aURIFlags, &uriHasFlags);
@@ -698,7 +698,7 @@ nsScriptSecurityManager::CheckLoadURIWithPrincipal(nsIPrincipal* aPrincipal,
                  "must have a URI!");
         return NS_ERROR_UNEXPECTED;
     }
-    
+
     // Automatic loads are not allowed from certain protocols.
     if (aFlags & nsIScriptSecurityManager::LOAD_IS_AUTOMATIC_DOCUMENT_REPLACEMENT) {
         nsresult rv =
@@ -882,7 +882,7 @@ nsScriptSecurityManager::CheckLoadURIWithPrincipal(nsIPrincipal* aPrincipal,
             console->LogStringMessage(message.get());
         }
     }
-    
+
     return NS_OK;
 }
 
@@ -1291,7 +1291,7 @@ nsScriptSecurityManager::CanGetService(JSContext *cx,
 // Method implementing nsIChannelEventSink //
 /////////////////////////////////////////////
 NS_IMETHODIMP
-nsScriptSecurityManager::AsyncOnChannelRedirect(nsIChannel* oldChannel, 
+nsScriptSecurityManager::AsyncOnChannelRedirect(nsIChannel* oldChannel,
                                                 nsIChannel* newChannel,
                                                 uint32_t redirFlags,
                                                 nsIAsyncVerifyRedirectCallback *cb)
@@ -1441,7 +1441,7 @@ nsScriptSecurityManager::GetScriptSecurityManager()
         if (NS_FAILED(rv)) {
             return nullptr;
         }
- 
+
         rv = nsXPConnect::XPConnect()->
             SetDefaultSecurityManager(ssManager);
         if (NS_FAILED(rv)) {

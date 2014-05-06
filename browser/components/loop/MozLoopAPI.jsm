@@ -32,6 +32,22 @@ function injectLoopAPI(targetWindow) {
       }
     },
 
+    getCookies: {
+      enumerable: true,
+      configurable: true,
+      writable: true,
+      value: function() {
+        let host = Services.prefs.getCharPref("loop.server");
+        let cenum = Services.cookies.getCookiesFromHost(host);
+        let results = [];
+        while (cenum.hasMoreElements()) {
+          let cookie = cenum.getNext().QueryInterface(Ci.nsICookie2);
+          results.push({name: cookie.name, value: cookie.value});
+        }
+        return results;
+      }
+    },
+
     getLocale: {
       enumerable: true,
       configurable: true,

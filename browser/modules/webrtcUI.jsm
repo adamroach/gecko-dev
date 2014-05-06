@@ -126,13 +126,26 @@ function prompt(aContentWindow, aCallID, aAudioRequested, aVideoRequested, aDevi
   // Use the nodePrincipal rather than the documentURIObject as this works better for
   // special (e.g. about:loop*) pages where we set the nodePrincipal to the server we're
   // communicating with.
-  let uri = aContentWindow.document.nodePrincipal.URI;
+  let uri = aContentWindow.document.documentURIObject;
   let browser = getBrowserForWindow(aContentWindow);
   let chromeDoc = browser.ownerDocument;
   let chromeWin = chromeDoc.defaultView;
   let stringBundle = chromeWin.gNavigatorBundle;
-  let message = stringBundle.getFormattedString("getUserMedia.share" + requestType + ".message",
+  let message;
+  try {
+    message = stringBundle.getFormattedString("getUserMedia.share" + requestType + ".message",
                                                 [ uri.host ]);
+  } catch (x) {
+    debugger;
+    var spec = uri.spec;
+    if (uri.spec.startsWith("about:loop")) {
+      message = "Allow Loop to share your microphone and camera?";
+    }
+    else {
+      Cu.reportError("Something went wrong!");
+      return;
+    }
+  }
 
   let mainAction = {
     label: PluralForm.get(requestType == "CameraAndMicrophone" ? 2 : 1,
