@@ -96,7 +96,7 @@ using namespace mozilla::dom::indexedDB;
 using namespace mozilla::widget;
 using namespace mozilla::jsipc;
 
-NS_IMPL_ISUPPORTS1(ContentListener, nsIDOMEventListener)
+NS_IMPL_ISUPPORTS(ContentListener, nsIDOMEventListener)
 
 static const CSSSize kDefaultViewportSize(980, 480);
 
@@ -121,9 +121,10 @@ TabChildBase::TabChildBase()
 NS_IMPL_CYCLE_COLLECTING_ADDREF(TabChildBase)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(TabChildBase)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(TabChildBase)
+  NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
-NS_IMPL_CYCLE_COLLECTION_2(TabChildBase, mTabChildGlobal, mGlobal)
+NS_IMPL_CYCLE_COLLECTION(TabChildBase, mTabChildGlobal, mGlobal)
 
 void
 TabChildBase::InitializeRootMetrics()
@@ -145,12 +146,6 @@ TabChildBase::InitializeRootMetrics()
   // as the resolution.
   mLastRootMetrics.mResolution = mLastRootMetrics.mCumulativeResolution / LayoutDeviceToParentLayerScale(1);
   mLastRootMetrics.SetScrollOffset(CSSPoint(0, 0));
-}
-
-bool
-TabChildBase::HasValidInnerSize()
-{
-  return (mInnerSize.width != 0) && (mInnerSize.height != 0);
 }
 
 void
@@ -202,7 +197,7 @@ TabChildBase::HandlePossibleViewportChange()
   nsViewportInfo viewportInfo = nsContentUtils::GetViewportInfo(document, mInnerSize);
   uint32_t presShellId;
   mozilla::layers::FrameMetrics::ViewID viewId;
-  bool scrollIdentifiersValid = APZCCallbackHelper::GetScrollIdentifiers(
+  bool scrollIdentifiersValid = APZCCallbackHelper::GetOrCreateScrollIdentifiers(
         document->GetDocumentElement(), &presShellId, &viewId);
   if (scrollIdentifiersValid) {
     ZoomConstraints constraints(
@@ -696,6 +691,7 @@ TabChild::TabChild(ContentChild* aManager, const TabContext& aContext, uint32_t 
   , mWaitingTouchListeners(false)
   , mIgnoreKeyPressEvent(false)
   , mActiveElementManager(new ActiveElementManager())
+  , mHasValidInnerSize(false)
 {
   if (!sActiveDurationMsSet) {
     Preferences::AddIntVarCache(&sActiveDurationMs,
@@ -731,8 +727,8 @@ TabChild::Observe(nsISupports *aSubject,
       nsCOMPtr<nsIDocument> doc(GetDocument());
       uint32_t presShellId;
       ViewID viewId;
-      if (APZCCallbackHelper::GetScrollIdentifiers(doc->GetDocumentElement(),
-                                                    &presShellId, &viewId)) {
+      if (APZCCallbackHelper::GetOrCreateScrollIdentifiers(doc->GetDocumentElement(),
+                                                           &presShellId, &viewId)) {
         CSSRect rect;
         sscanf(NS_ConvertUTF16toUTF8(aData).get(),
                "{\"x\":%f,\"y\":%f,\"w\":%f,\"h\":%f}",
@@ -747,6 +743,7 @@ TabChild::Observe(nsISupports *aSubject,
 
       if (SameCOMIdentity(subject, doc)) {
         nsCOMPtr<nsIDOMWindowUtils> utils(GetDOMWindowUtils());
+        utils->SetIsFirstPaint(true);
 
         mContentDocumentIsDisplayed = true;
 
@@ -809,9 +806,6 @@ TabChild::OnLocationChange(nsIWebProgress* aWebProgress,
   if (!window) {
     return NS_OK;
   }
-
-  nsCOMPtr<nsIDOMWindowUtils> utils(do_GetInterface(window));
-  utils->SetIsFirstPaint(true);
 
   nsCOMPtr<nsIDOMDocument> progressDoc;
   window->GetDocument(getter_AddRefs(progressDoc));
@@ -982,8 +976,7 @@ TabChild::NotifyTabContextUpdated()
     }
 }
 
-NS_INTERFACE_MAP_BEGIN(TabChild)
-  NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIWebBrowserChrome)
+NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(TabChild)
   NS_INTERFACE_MAP_ENTRY(nsIWebBrowserChrome)
   NS_INTERFACE_MAP_ENTRY(nsIWebBrowserChrome2)
   NS_INTERFACE_MAP_ENTRY(nsIEmbeddingSiteWindow)
@@ -996,10 +989,10 @@ NS_INTERFACE_MAP_BEGIN(TabChild)
   NS_INTERFACE_MAP_ENTRY(nsIObserver)
   NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
   NS_INTERFACE_MAP_ENTRY(nsITooltipListener)
-NS_INTERFACE_MAP_END
+NS_INTERFACE_MAP_END_INHERITING(TabChildBase)
 
-NS_IMPL_ADDREF(TabChild)
-NS_IMPL_RELEASE(TabChild)
+NS_IMPL_ADDREF_INHERITED(TabChild, TabChildBase);
+NS_IMPL_RELEASE_INHERITED(TabChild, TabChildBase);
 
 NS_IMETHODIMP
 TabChild::SetStatus(uint32_t aStatusType, const char16_t* aStatus)
@@ -1288,6 +1281,12 @@ TabChild::BrowserFrameProvideWindow(nsIDOMWindow* aOpener,
   nsCOMPtr<nsIDOMWindow> win = do_GetInterface(newChild->WebNavigation());
   win.forget(aReturn);
   return NS_OK;
+}
+
+bool
+TabChild::HasValidInnerSize()
+{
+  return mHasValidInnerSize;
 }
 
 #ifdef DEBUG
@@ -1616,6 +1615,9 @@ TabChild::RecvUpdateDimensions(const nsRect& rect, const nsIntSize& size, const 
 
     bool initialSizing = !HasValidInnerSize()
                       && (size.width != 0 && size.height != 0);
+    if (initialSizing) {
+      mHasValidInnerSize = true;
+    }
 
     mOrientation = orientation;
     mInnerSize = ScreenIntSize::FromUnknownSize(
@@ -1978,7 +1980,7 @@ TabChild::RecvRealTouchEvent(const WidgetTouchEvent& aEvent,
   }
 
   if (aEvent.message == NS_TOUCH_START && localEvent.touches.Length() > 0) {
-    mActiveElementManager->SetTargetElement(localEvent.touches[0]->Target());
+    mActiveElementManager->SetTargetElement(localEvent.touches[0]->GetTarget());
   }
 
   nsCOMPtr<nsPIDOMWindow> outerWindow = do_GetInterface(WebNavigation());
@@ -2720,8 +2722,8 @@ TabChildGlobal::Init()
                                               MM_CHILD);
 }
 
-NS_IMPL_CYCLE_COLLECTION_INHERITED_2(TabChildGlobal, DOMEventTargetHelper,
-                                     mMessageManager, mTabChild)
+NS_IMPL_CYCLE_COLLECTION_INHERITED(TabChildGlobal, DOMEventTargetHelper,
+                                   mMessageManager, mTabChild)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(TabChildGlobal)
   NS_INTERFACE_MAP_ENTRY(nsIMessageListenerManager)

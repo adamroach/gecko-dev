@@ -3,7 +3,20 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 "use strict";
+
+const Debugger = require("Debugger");
+const Services = require("Services");
+const { Cc, Ci, Cu, components } = require("chrome");
+const { ActorPool } = require("devtools/server/actors/common");
+const { DebuggerServer } = require("devtools/server/main");
+const DevToolsUtils = require("devtools/toolkit/DevToolsUtils");
+const { dbg_assert, dumpn, update } = DevToolsUtils;
+const { SourceMapConsumer, SourceMapGenerator } = require("source-map");
+const { defer, resolve, reject, all } = require("devtools/toolkit/deprecated-sync-thenables");
+
+Cu.import("resource://gre/modules/NetUtil.jsm");
 
 let B2G_ID = "{3c2e2abc-06d4-11e1-ac3b-374f68613e61}";
 
@@ -24,7 +37,7 @@ let addonManager = null;
  * about them.
  */
 function mapURIToAddonID(uri, id) {
-  if (Services.appinfo.ID == B2G_ID) {
+  if ((Services.appinfo.ID || undefined) == B2G_ID) {
     return false;
   }
 
@@ -37,7 +50,7 @@ function mapURIToAddonID(uri, id) {
     return addonManager.mapURIToAddonID(uri, id);
   }
   catch (e) {
-    DevtoolsUtils.reportException("mapURIToAddonID", e);
+    DevToolsUtils.reportException("mapURIToAddonID", e);
     return false;
   }
 }
@@ -312,6 +325,8 @@ BreakpointStore.prototype = {
   },
 };
 
+exports.BreakpointStore = BreakpointStore;
+
 /**
  * Manages pushing event loops and automatically pops and exits them in the
  * correct order as they are resolved.
@@ -554,7 +569,7 @@ ThreadActor.prototype = {
       this._prettyPrintWorker.addEventListener(
         "error", this._onPrettyPrintError, false);
 
-      if (wantLogging) {
+      if (dumpn.wantLogging) {
         this._prettyPrintWorker.addEventListener("message", this._onPrettyPrintMsg, false);
 
         const postMsg = this._prettyPrintWorker.postMessage;
@@ -2397,6 +2412,7 @@ ThreadActor.prototype.requestTypes = {
   "prototypesAndProperties": ThreadActor.prototype.onPrototypesAndProperties
 };
 
+exports.ThreadActor = ThreadActor;
 
 /**
  * Creates a PauseActor.
@@ -3025,6 +3041,7 @@ let stringifiers = {
  */
 function ObjectActor(aObj, aThreadActor)
 {
+  dbg_assert(!aObj.optimizedOut, "Should not create object actors for optimized out values!");
   this.obj = aObj;
   this.threadActor = aThreadActor;
 }
@@ -3460,6 +3477,7 @@ ObjectActor.prototype.requestTypes = {
   "scope": ObjectActor.prototype.onScope,
 };
 
+exports.ObjectActor = ObjectActor;
 
 /**
  * Functions for adding information to ObjectActor grips for the purpose of
@@ -4235,6 +4253,7 @@ LongStringActor.prototype.requestTypes = {
   "release": LongStringActor.prototype.onRelease
 };
 
+exports.LongStringActor = LongStringActor;
 
 /**
  * Creates an actor for the specified stack frame.
@@ -4534,10 +4553,16 @@ EnvironmentActor.prototype = {
     }
     for each (let name in parameterNames) {
       let arg = {};
+
+      let value = this.obj.getVariable(name);
+      if (value && value.optimizedOut) {
+        continue;
+      }
+
       // TODO: this part should be removed in favor of the commented-out part
       // below when getVariableDescriptor lands (bug 725815).
       let desc = {
-        value: this.obj.getVariable(name),
+        value: value,
         configurable: false,
         writable: true,
         enumerable: true
@@ -4566,15 +4591,12 @@ EnvironmentActor.prototype = {
         continue;
       }
 
-      // TODO: this part should be removed in favor of the commented-out part
-      // below when getVariableDescriptor lands.
-      let desc = {
-        configurable: false,
-        writable: true,
-        enumerable: true
-      };
+      let value;
       try {
-        desc.value = this.obj.getVariable(name);
+        value = this.obj.getVariable(name);
+        if (value && value.optimizedOut) {
+          continue;
+        }
       } catch (e) {
         // Avoid "Debugger scope is not live" errors for |arguments|, introduced
         // in bug 746601.
@@ -4582,6 +4604,16 @@ EnvironmentActor.prototype = {
           throw e;
         }
       }
+
+      // TODO: this part should be removed in favor of the commented-out part
+      // below when getVariableDescriptor lands.
+      let desc = {
+        value: value,
+        configurable: false,
+        writable: true,
+        enumerable: true
+      };
+
       //let desc = this.obj.getVariableDescriptor(name);
       let descForm = {
         enumerable: true,
@@ -4645,6 +4677,8 @@ EnvironmentActor.prototype.requestTypes = {
   "assign": EnvironmentActor.prototype.onAssign,
   "bindings": EnvironmentActor.prototype.onBindings
 };
+
+exports.EnvironmentActor = EnvironmentActor;
 
 /**
  * Override the toString method in order to get more meaningful script output
@@ -4747,6 +4781,8 @@ update(ChromeDebuggerActor.prototype, {
   }
 });
 
+exports.ChromeDebuggerActor = ChromeDebuggerActor;
+
 /**
  * Creates an actor for handling add-on debugging. AddonThreadActor is
  * a thin wrapper over ThreadActor.
@@ -4780,25 +4816,27 @@ update(AddonThreadActor.prototype, {
 
   onAttach: function(aRequest) {
     if (!this.attached) {
-      Services.obs.addObserver(this, "document-element-inserted", false);
+      Services.obs.addObserver(this, "chrome-document-global-created", false);
+      Services.obs.addObserver(this, "content-document-global-created", false);
     }
     return ThreadActor.prototype.onAttach.call(this, aRequest);
   },
 
   disconnect: function() {
     if (this.attached) {
-      Services.obs.removeObserver(this, "document-element-inserted");
+      Services.obs.removeObserver(this, "content-document-global-created");
+      Services.obs.removeObserver(this, "chrome-document-global-created");
     }
     return ThreadActor.prototype.disconnect.call(this);
   },
 
   /**
-   * Called when a new DOM document element is created. Check if the DOM was
-   * laoded from an add-on and if so make the window a debuggee.
+   * Called when a new DOM document global is created. Check if the DOM was
+   * loaded from an add-on and if so make the window a debuggee.
    */
   observe: function(aSubject, aTopic, aData) {
     let id = {};
-    if (mapURIToAddonID(aSubject.documentURIObject, id) && id.value === this.addonID) {
+    if (mapURIToAddonID(aSubject.location, id) && id.value === this.addonID) {
       this.dbg.addDebuggee(aSubject.defaultView);
     }
   },
@@ -4919,6 +4957,8 @@ AddonThreadActor.prototype.requestTypes = Object.create(ThreadActor.prototype.re
 update(AddonThreadActor.prototype.requestTypes, {
   "attach": AddonThreadActor.prototype.onAttach
 });
+
+exports.AddonThreadActor = AddonThreadActor;
 
 /**
  * Manages the sources for a thread. Handles source maps, locations in the
@@ -5282,6 +5322,8 @@ ThreadSources.prototype = {
   }
 };
 
+exports.ThreadSources = ThreadSources;
+
 // Utility functions.
 
 // TODO bug 863089: use Debugger.Script.prototype.getOffsetColumn when it is
@@ -5330,25 +5372,6 @@ function getFrameLocation(aFrame) {
 }
 
 /**
- * Utility function for updating an object with the properties of another
- * object.
- *
- * @param aTarget Object
- *        The object being updated.
- * @param aNewAttrs Object
- *        The new attributes being set on the target.
- */
-function update(aTarget, aNewAttrs) {
-  for (let key in aNewAttrs) {
-    let desc = Object.getOwnPropertyDescriptor(aNewAttrs, key);
-
-    if (desc) {
-      Object.defineProperty(aTarget, key, desc);
-    }
-  }
-}
-
-/**
  * Returns true if its argument is not null.
  */
 function isNotNull(aThing) {
@@ -5390,7 +5413,7 @@ function fetch(aURL, aOptions={ loadFromCache: true }) {
     case "resource":
       try {
         NetUtil.asyncFetch(url, function onFetch(aStream, aStatus, aRequest) {
-          if (!Components.isSuccessCode(aStatus)) {
+          if (!components.isSuccessCode(aStatus)) {
             deferred.reject(new Error("Request failed with status code = "
                                       + aStatus
                                       + " after NetUtil.asyncFetch for url = "
@@ -5421,7 +5444,7 @@ function fetch(aURL, aOptions={ loadFromCache: true }) {
       let chunks = [];
       let streamListener = {
         onStartRequest: function(aRequest, aContext, aStatusCode) {
-          if (!Components.isSuccessCode(aStatusCode)) {
+          if (!components.isSuccessCode(aStatusCode)) {
             deferred.reject(new Error("Request failed with status code = "
                                       + aStatusCode
                                       + " in onStartRequest handler for url = "
@@ -5432,7 +5455,7 @@ function fetch(aURL, aOptions={ loadFromCache: true }) {
           chunks.push(NetUtil.readInputStreamToString(aStream, aCount));
         },
         onStopRequest: function(aRequest, aContext, aStatusCode) {
-          if (!Components.isSuccessCode(aStatusCode)) {
+          if (!components.isSuccessCode(aStatusCode)) {
             deferred.reject(new Error("Request failed with status code = "
                                       + aStatusCode
                                       + " in onStopRequest handler for url = "
@@ -5596,4 +5619,16 @@ function makeDebuggeeValueIfNeeded(obj, value) {
 function getInnerId(window) {
   return window.QueryInterface(Ci.nsIInterfaceRequestor).
                 getInterface(Ci.nsIDOMWindowUtils).currentInnerWindowID;
+};
+
+exports.register = function(handle) {
+  ThreadActor.breakpointStore = new BreakpointStore();
+  ThreadSources._blackBoxedSources = new Set(["self-hosted"]);
+  ThreadSources._prettyPrintedSources = new Map();
+};
+
+exports.unregister = function(handle) {
+  ThreadActor.breakpointStore = null;
+  ThreadSources._blackBoxedSources.clear();
+  ThreadSources._prettyPrintedSources.clear();
 };

@@ -740,6 +740,7 @@ toolbarbutton[sdk-button="true"][cui-areatype="toolbar"] > .toolbarbutton-icon {
 }
 
 #forward-button {
+  -moz-box-align: stretch; /* let the button shape grow vertically with the location bar */
   padding: 0;
 }
 
@@ -878,7 +879,7 @@ toolbarbutton[sdk-button="true"][cui-areatype="toolbar"] > .toolbarbutton-icon {
   padding: 1px;
   border: 1px solid ThreeDShadow;
   border-radius: 2px;
-  margin: 1px 3px;
+  margin: 0 3px;
 }
 
 #urlbar[focused],
@@ -1265,7 +1266,7 @@ toolbarbutton[sdk-button="true"][cui-areatype="toolbar"] > .toolbarbutton-icon {
   position: relative;
   background-color: #fff;
   background-clip: padding-box;
-  padding-left: 4px;
+  padding-left: 3px;
   border-radius: 2.5px 0 0 2.5px;
   border-width: 0 8px 0 0;
   border-style: solid;
@@ -1273,6 +1274,10 @@ toolbarbutton[sdk-button="true"][cui-areatype="toolbar"] > .toolbarbutton-icon {
   -moz-margin-end: -8px;
   margin-top: -1px;
   margin-bottom: -1px;
+}
+
+@conditionalForwardWithUrlbar@ > #forward-button[disabled] + #urlbar > #notification-popup-box {
+  padding-left: 7px;
 }
 
 #notification-popup-box:not([hidden]) + #identity-box {
@@ -1772,32 +1777,15 @@ richlistitem[type~="action"][actiontype="switchtab"] > .ac-url-box > .ac-action-
   z-index: 3;
 }
 
-/* In-tab close button */
-.tab-close-button > .toolbarbutton-icon {
-  /* XXX Buttons have padding in widget/ that we don't want here but can't override with good CSS, so we must
-     use evil CSS to give the impression of smaller content */
-  margin: -4px;
-}
-
-/* Tabstrip close button */
-.tabs-closebutton,
-.tab-close-button {
-  -moz-appearance: none;
-  height: 16px;
-  width: 16px;
-}
-
-.tabs-closebutton:not([selected]):not(:hover),
+/* Tab close button */
 .tab-close-button:not([selected]):not(:hover) {
   background-image: -moz-image-rect(url("chrome://global/skin/icons/close.svg"), 0, 64, 16, 48);
 }
 
-.tabs-closebutton:not([selected]):not(:hover):-moz-lwtheme-brighttext,
 .tab-close-button:not([selected]):not(:hover):-moz-lwtheme-brighttext {
   background-image: -moz-image-rect(url("chrome://global/skin/icons/close.svg"), 0, 80, 16, 64);
 }
 
-.tabs-closebutton:not([selected]):not(:hover):-moz-lwtheme-darktext,
 .tab-close-button:not([selected]):not(:hover):-moz-lwtheme-darktext {
   background-image: -moz-image-rect(url("chrome://global/skin/icons/close.svg"), 0, 96, 16, 80);
 }
@@ -1808,23 +1796,6 @@ richlistitem[type~="action"][actiontype="switchtab"] > .ac-url-box > .ac-action-
 #TabsToolbar > #wrapper-new-tab-button > #new-tab-button {
   list-style-image: url("moz-icon://stock/gtk-add?size=menu");
   -moz-image-region: auto;
-}
-
-.customization-tipPanel-closeBox > .close-icon {
-  -moz-appearance: none;
-  width: 16px;
-  height: 16px;
-}
-
-/* The :hover:active style from toolkit doesn't seem to work in this panel so just use :active. */
-.customization-tipPanel-closeBox > .close-icon:active {
-  background-image: -moz-image-rect(url("chrome://global/skin/icons/close.svg"), 0, 48, 16, 32);
-}
-
-.tabs-closebutton > .toolbarbutton-icon {
-  /* XXX Buttons have padding in widget/ that we don't want here but can't override with good CSS, so we must
-     use evil CSS to give the impression of smaller content */
-  margin: -2px;
 }
 
 /* Tabbrowser arrowscrollbox arrows */
@@ -1903,11 +1874,6 @@ richlistitem[type~="action"][actiontype="switchtab"] > .ac-url-box > .ac-action-
 }
 
 /* Sidebar */
-#sidebar-header > .tabs-closebutton {
-  margin-bottom: 0px !important;
-  padding: 0px 2px 0px 2px !important;
-}
-
 #sidebar-throbber[loading="true"] {
   list-style-image: url("chrome://global/skin/icons/loading_16.png");
   -moz-margin-end: 4px;
@@ -2233,6 +2199,11 @@ chatbox {
   background-clip: padding-box;
   border-right: 3px solid transparent;
   border-left: 3px solid transparent;
+}
+
+/* The :hover:active style from toolkit doesn't seem to work in this panel so just use :active. */
+.customization-tipPanel-closeBox > .close-icon:active {
+  background-image: -moz-image-rect(url("chrome://global/skin/icons/close.svg"), 0, 48, 16, 32);
 }
 
 /* End customization mode */

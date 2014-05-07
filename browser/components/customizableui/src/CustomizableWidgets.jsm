@@ -114,7 +114,6 @@ function fillSubviewFromMenuItems(aMenuItems, aSubview) {
       subviewItem = doc.createElementNS(kNSXUL, "menuseparator");
     } else if (menuChild.localName == "menuitem") {
       subviewItem = doc.createElementNS(kNSXUL, "toolbarbutton");
-      subviewItem.setAttribute("class", "subviewbutton");
       addShortcut(menuChild, doc, subviewItem);
     } else {
       continue;
@@ -123,6 +122,10 @@ function fillSubviewFromMenuItems(aMenuItems, aSubview) {
       let attrVal = menuChild.getAttribute(attr);
       if (attrVal)
         subviewItem.setAttribute(attr, attrVal);
+    }
+    // We do this after so the .subviewbutton class doesn't get overriden.
+    if (menuChild.localName == "menuitem") {
+      subviewItem.classList.add("subviewbutton");
     }
     fragment.appendChild(subviewItem);
   }
@@ -911,4 +914,37 @@ if (Services.metro && Services.metro.supported) {
   });
 }
 #endif
+#endif
+
+#ifdef NIGHTLY_BUILD
+/**
+ * The e10s button's purpose is to lower the barrier of entry
+ * for our Nightly testers to use e10s windows. We'll be removing it
+ * once remote tabs are enabled. This button should never ever make it
+ * to production. If it does, that'd be bad, and we should all feel bad.
+ */
+if (Services.prefs.getBoolPref("browser.tabs.remote")) {
+  let getCommandFunction = function(aOpenRemote) {
+    return function(aEvent) {
+      let win = aEvent.view;
+      if (win && typeof win.OpenBrowserWindow == "function") {
+        win.OpenBrowserWindow({remote: aOpenRemote});
+      }
+    };
+  }
+
+  let openRemote = !Services.prefs.getBoolPref("browser.tabs.remote.autostart");
+  // Like the XUL menuitem counterparts, we hard-code these strings in because
+  // this button should never roll into production.
+  let buttonLabel = openRemote ? "New e10s Window"
+                               : "New Non-e10s Window";
+
+  CustomizableWidgets.push({
+    id: "e10s-button",
+    label: buttonLabel,
+    tooltiptext: buttonLabel,
+    defaultArea: CustomizableUI.AREA_PANEL,
+    onCommand: getCommandFunction(openRemote),
+  });
+}
 #endif

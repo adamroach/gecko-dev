@@ -199,26 +199,26 @@ nsHTMLDocument::~nsHTMLDocument()
 {
 }
 
-NS_IMPL_CYCLE_COLLECTION_INHERITED_11(nsHTMLDocument, nsDocument,
-                                      mAll,
-                                      mImages,
-                                      mApplets,
-                                      mEmbeds,
-                                      mLinks,
-                                      mAnchors,
-                                      mScripts,
-                                      mForms,
-                                      mFormControls,
-                                      mWyciwygChannel,
-                                      mMidasCommandManager)
+NS_IMPL_CYCLE_COLLECTION_INHERITED(nsHTMLDocument, nsDocument,
+                                   mAll,
+                                   mImages,
+                                   mApplets,
+                                   mEmbeds,
+                                   mLinks,
+                                   mAnchors,
+                                   mScripts,
+                                   mForms,
+                                   mFormControls,
+                                   mWyciwygChannel,
+                                   mMidasCommandManager)
 
 NS_IMPL_ADDREF_INHERITED(nsHTMLDocument, nsDocument)
 NS_IMPL_RELEASE_INHERITED(nsHTMLDocument, nsDocument)
 
 // QueryInterface implementation for nsHTMLDocument
 NS_INTERFACE_TABLE_HEAD_CYCLE_COLLECTION_INHERITED(nsHTMLDocument)
-  NS_INTERFACE_TABLE_INHERITED2(nsHTMLDocument, nsIHTMLDocument,
-                                nsIDOMHTMLDocument)
+  NS_INTERFACE_TABLE_INHERITED(nsHTMLDocument, nsIHTMLDocument,
+                               nsIDOMHTMLDocument)
 NS_INTERFACE_TABLE_TAIL_INHERITING(nsDocument)
 
 JSObject*
@@ -2849,27 +2849,10 @@ nsHTMLDocument::SetDesignMode(const nsAString & aDesignMode)
 void
 nsHTMLDocument::SetDesignMode(const nsAString& aDesignMode, ErrorResult& rv)
 {
-  if (!nsContentUtils::IsCallerChrome()) {
-    nsCOMPtr<nsIPrincipal> subject;
-    nsIScriptSecurityManager *secMan = nsContentUtils::GetSecurityManager();
-    rv = secMan->GetSubjectPrincipal(getter_AddRefs(subject));
-    if (rv.Failed()) {
-      return;
-    }
-    if (subject) {
-      bool subsumes;
-      rv = subject->Subsumes(NodePrincipal(), &subsumes);
-      if (rv.Failed()) {
-        return;
-      }
-
-      if (!subsumes) {
-        rv.Throw(NS_ERROR_DOM_PROP_ACCESS_DENIED);
-        return;
-      }
-    }
+  if (!nsContentUtils::GetSubjectPrincipal()->Subsumes(NodePrincipal())) {
+    rv.Throw(NS_ERROR_DOM_PROP_ACCESS_DENIED);
+    return;
   }
-
   bool editableMode = HasFlag(NODE_IS_EDITABLE);
   if (aDesignMode.LowerCaseEqualsASCII(editableMode ? "off" : "on")) {
     SetEditableFlag(!editableMode);

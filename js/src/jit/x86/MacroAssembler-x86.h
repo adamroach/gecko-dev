@@ -71,6 +71,7 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
     using MacroAssemblerX86Shared::branch32;
     using MacroAssemblerX86Shared::load32;
     using MacroAssemblerX86Shared::store32;
+    using MacroAssemblerX86Shared::call;
 
     MacroAssemblerX86()
       : inCall_(false),
@@ -1034,6 +1035,9 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
         bind(&noOverflow);
     }
 
+    void incrementInt32Value(const Address &addr) {
+        addl(Imm32(1), payloadOf(addr));
+    }
 
     // If source is a double, load it into dest. If source is int32,
     // convert it to double. Else, branch to failure.
@@ -1094,9 +1098,9 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
     }
 
     // Save an exit frame (which must be aligned to the stack pointer) to
-    // ThreadData::ionTop of the main thread.
+    // PerThreadData::jitTop of the main thread.
     void linkExitFrame() {
-        movl(StackPointer, Operand(AbsoluteAddress(GetIonContext()->runtime->addressOfIonTop())));
+        movl(StackPointer, Operand(AbsoluteAddress(GetIonContext()->runtime->addressOfJitTop())));
     }
 
     void callWithExitFrame(JitCode *target, Register dynStack) {
@@ -1105,16 +1109,23 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
         Push(dynStack);
         call(target);
     }
+    void call(const CallSiteDesc &desc, AsmJSImmPtr target) {
+        call(target);
+        appendCallSite(desc);
+    }
+    void callExit(AsmJSImmPtr target, uint32_t stackArgBytes) {
+        call(CallSiteDesc::Exit(), target);
+    }
 
     // Save an exit frame to the thread data of the current thread, given a
     // register that holds a PerThreadData *.
     void linkParallelExitFrame(const Register &pt) {
-        movl(StackPointer, Operand(pt, offsetof(PerThreadData, ionTop)));
+        movl(StackPointer, Operand(pt, offsetof(PerThreadData, jitTop)));
     }
 
 #ifdef JSGC_GENERATIONAL
-    void branchPtrInNurseryRange(Register ptr, Register temp, Label *label);
-    void branchValueIsNurseryObject(ValueOperand value, Register temp, Label *label);
+    void branchPtrInNurseryRange(Condition cond, Register ptr, Register temp, Label *label);
+    void branchValueIsNurseryObject(Condition cond, ValueOperand value, Register temp, Label *label);
 #endif
 };
 

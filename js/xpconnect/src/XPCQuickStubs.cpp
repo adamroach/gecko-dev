@@ -1,4 +1,5 @@
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/* vim: set ts=8 sts=4 et sw=4 tw=99: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -665,24 +666,6 @@ castNativeFromWrapper(JSContext *cx,
     }
 
     return native;
-}
-
-bool
-xpc_qsUnwrapThisFromCcxImpl(XPCCallContext &ccx,
-                            const nsIID &iid,
-                            void **ppThis,
-                            nsISupports **pThisRef,
-                            jsval *vp)
-{
-    nsISupports *native = ccx.GetIdentityObject();
-    if (!native)
-        return xpc_qsThrow(ccx.GetJSContext(), NS_ERROR_XPC_HAS_BEEN_SHUTDOWN);
-
-    RootedObject obj(ccx, ccx.GetFlattenedJSObject());
-    nsresult rv = getNative(native, obj, iid, ppThis, pThisRef, vp);
-    if (NS_FAILED(rv))
-        return xpc_qsThrow(ccx.GetJSContext(), rv);
-    return true;
 }
 
 nsresult

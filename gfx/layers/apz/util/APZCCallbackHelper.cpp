@@ -244,7 +244,7 @@ APZCCallbackHelper::UpdateRootFrame(nsIDOMWindowUtils* aUtils,
                     baseCSS.y * nsPresContext::AppUnitsPerCSSPixel(),
                     baseCSS.width * nsPresContext::AppUnitsPerCSSPixel(),
                     baseCSS.height * nsPresContext::AppUnitsPerCSSPixel());
-        nsLayoutUtils::SetDisplayPortBase(content, base);
+        nsLayoutUtils::SetDisplayPortBaseIfNotSet(content, base);
     }
 }
 
@@ -299,7 +299,7 @@ APZCCallbackHelper::UpdateSubFrame(nsIContent* aContent,
                         baseCSS.y * nsPresContext::AppUnitsPerCSSPixel(),
                         baseCSS.width * nsPresContext::AppUnitsPerCSSPixel(),
                         baseCSS.height * nsPresContext::AppUnitsPerCSSPixel());
-            nsLayoutUtils::SetDisplayPortBase(aContent, base);
+            nsLayoutUtils::SetDisplayPortBaseIfNotSet(aContent, base);
         }
     }
 
@@ -329,13 +329,14 @@ APZCCallbackHelper::GetDOMWindowUtils(const nsIContent* aContent)
 }
 
 bool
-APZCCallbackHelper::GetScrollIdentifiers(const nsIContent* aContent,
-                                         uint32_t* aPresShellIdOut,
-                                         FrameMetrics::ViewID* aViewIdOut)
+APZCCallbackHelper::GetOrCreateScrollIdentifiers(nsIContent* aContent,
+                                                 uint32_t* aPresShellIdOut,
+                                                 FrameMetrics::ViewID* aViewIdOut)
 {
-    if (!aContent || !nsLayoutUtils::FindIDFor(aContent, aViewIdOut)) {
+    if (!aContent) {
         return false;
     }
+    *aViewIdOut = nsLayoutUtils::FindOrCreateIDFor(aContent);
     nsCOMPtr<nsIDOMWindowUtils> utils = GetDOMWindowUtils(aContent);
     return utils && (utils->GetPresShellId(aPresShellIdOut) == NS_OK);
 }

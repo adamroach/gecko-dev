@@ -577,6 +577,23 @@ nsDOMWindowUtils::GetResolution(float* aXResolution, float* aYResolution)
 }
 
 NS_IMETHODIMP
+nsDOMWindowUtils::GetIsHistoryRestored(bool* aIsHistoryRestored) {
+  if (!nsContentUtils::IsCallerChrome()) {
+    return NS_ERROR_DOM_SECURITY_ERR;
+  }
+
+  nsIPresShell* presShell = GetPresShell();
+  if (!presShell) {
+    return NS_ERROR_FAILURE;
+  }
+
+  const nsIScrollableFrame* sf = presShell->GetRootScrollFrameAsScrollable();
+  *aIsHistoryRestored = sf && sf->DidHistoryRestore();
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 nsDOMWindowUtils::SetIsFirstPaint(bool aIsFirstPaint)
 {
   if (!nsContentUtils::IsCallerChrome()) {
@@ -1487,6 +1504,18 @@ nsDOMWindowUtils::CycleCollect(nsICycleCollectorListener *aListener,
 }
 
 NS_IMETHODIMP
+nsDOMWindowUtils::RunNextCollectorTimer()
+{
+  if (!nsContentUtils::IsCallerChrome()) {
+    return NS_ERROR_DOM_SECURITY_ERR;
+  }
+
+  nsJSContext::RunNextCollectorTimer();
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 nsDOMWindowUtils::SendSimpleGestureEvent(const nsAString& aType,
                                          float aX,
                                          float aY,
@@ -2191,6 +2220,7 @@ NS_IMETHODIMP
 nsDOMWindowUtils::SendQueryContentEvent(uint32_t aType,
                                         uint32_t aOffset, uint32_t aLength,
                                         int32_t aX, int32_t aY,
+                                        uint32_t aAdditionalFlags,
                                         nsIQueryContentEventResult **aResult)
 {
   *aResult = nullptr;
@@ -2229,9 +2259,13 @@ nsDOMWindowUtils::SendQueryContentEvent(uint32_t aType,
   nsCOMPtr<nsIWidget> targetWidget = widget;
   LayoutDeviceIntPoint pt(aX, aY);
 
+  bool useNativeLineBreak =
+    !(aAdditionalFlags & QUERY_CONTENT_FLAG_USE_XP_LINE_BREAK);
+
   if (aType == QUERY_CHARACTER_AT_POINT) {
     // Looking for the widget at the point.
     WidgetQueryContentEvent dummyEvent(true, NS_QUERY_CONTENT_STATE, widget);
+    dummyEvent.mUseNativeLineBreak = useNativeLineBreak;
     InitEvent(dummyEvent, &pt);
     nsIFrame* popupFrame =
       nsLayoutUtils::GetPopupFrameForEventCoordinates(presContext->GetRootPresContext(), &dummyEvent);
@@ -2261,13 +2295,16 @@ nsDOMWindowUtils::SendQueryContentEvent(uint32_t aType,
 
   switch (aType) {
     case NS_QUERY_TEXT_CONTENT:
-      queryEvent.InitForQueryTextContent(aOffset, aLength);
+      queryEvent.InitForQueryTextContent(aOffset, aLength, useNativeLineBreak);
       break;
     case NS_QUERY_CARET_RECT:
-      queryEvent.InitForQueryCaretRect(aOffset);
+      queryEvent.InitForQueryCaretRect(aOffset, useNativeLineBreak);
       break;
     case NS_QUERY_TEXT_RECT:
-      queryEvent.InitForQueryTextRect(aOffset, aLength);
+      queryEvent.InitForQueryTextRect(aOffset, aLength, useNativeLineBreak);
+      break;
+    default:
+      queryEvent.mUseNativeLineBreak = useNativeLineBreak;
       break;
   }
 
@@ -2285,7 +2322,7 @@ nsDOMWindowUtils::SendQueryContentEvent(uint32_t aType,
 NS_IMETHODIMP
 nsDOMWindowUtils::SendSelectionSetEvent(uint32_t aOffset,
                                         uint32_t aLength,
-                                        bool aReverse,
+                                        uint32_t aAdditionalFlags,
                                         bool *aResult)
 {
   *aResult = false;
@@ -2305,7 +2342,9 @@ nsDOMWindowUtils::SendSelectionSetEvent(uint32_t aOffset,
 
   selectionEvent.mOffset = aOffset;
   selectionEvent.mLength = aLength;
-  selectionEvent.mReversed = aReverse;
+  selectionEvent.mReversed = (aAdditionalFlags & SELECTION_SET_FLAG_REVERSE);
+  selectionEvent.mUseNativeLineBreak =
+    !(aAdditionalFlags & SELECTION_SET_FLAG_USE_XP_LINE_BREAK);
 
   nsEventStatus status;
   nsresult rv = widget->DispatchEvent(&selectionEvent, status);
@@ -2364,11 +2403,11 @@ nsDOMWindowUtils::GetClassName(JS::Handle<JS::Value> aObject, JSContext* aCx,
   }
 
   // Our argument must be a non-null object.
-  if (JSVAL_IS_PRIMITIVE(aObject)) {
+  if (aObject.isPrimitive()) {
     return NS_ERROR_XPC_BAD_CONVERT_JS;
   }
 
-  *aName = NS_strdup(JS_GetClass(JSVAL_TO_OBJECT(aObject))->name);
+  *aName = NS_strdup(JS_GetClass(aObject.toObjectOrNull())->name);
   NS_ABORT_IF_FALSE(*aName, "NS_strdup should be infallible.");
   return NS_OK;
 }
@@ -3054,6 +3093,17 @@ nsDOMWindowUtils::CheckAndClearPaintedState(nsIDOMElement* aElement, bool* aResu
     return NS_OK;
   }
 
+  // Get the outermost frame for the content node, so that we can test
+  // canvasframe invalidations by observing the documentElement.
+  for (;;) {
+    nsIFrame* parentFrame = frame->GetParent();
+    if (parentFrame && parentFrame->GetContent() == content) {
+      frame = parentFrame;
+    } else {
+      break;
+    }
+  }
+
   *aResult = frame->CheckAndClearPaintedState();
   return NS_OK;
 }
@@ -3190,8 +3240,8 @@ nsDOMWindowUtils::GetFileId(JS::Handle<JS::Value> aFile, JSContext* aCx,
     return NS_ERROR_DOM_SECURITY_ERR;
   }
 
-  if (!JSVAL_IS_PRIMITIVE(aFile)) {
-    JSObject* obj = JSVAL_TO_OBJECT(aFile);
+  if (!aFile.isPrimitive()) {
+    JSObject* obj = aFile.toObjectOrNull();
 
     file::FileHandle* fileHandle;
     if (NS_SUCCEEDED(UNWRAP_OBJECT(FileHandle, obj, fileHandle))) {
@@ -3965,6 +4015,13 @@ nsDOMWindowUtils::SetAudioVolume(float aVolume)
   NS_ENSURE_STATE(window);
 
   return window->SetAudioVolume(aVolume);
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::XpconnectArgument(nsIDOMWindowUtils* aThis)
+{
+  // Do nothing.
+  return NS_OK;
 }
 
 NS_INTERFACE_MAP_BEGIN(nsTranslationNodeList)

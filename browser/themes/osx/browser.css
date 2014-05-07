@@ -165,6 +165,11 @@ toolbarseparator {
   min-height: 19px; /* 16px button height + 2px padding + 1px margin-bottom */
 }
 
+#nav-bar-customization-target > #wrapper-personal-bookmarks > #personal-bookmarks {
+  min-height: 32px;
+  -moz-box-align: center;
+}
+
 toolbarbutton.chevron {
   list-style-image: url("chrome://global/skin/icons/chevron.png");
   margin: 1px 0 0;
@@ -701,6 +706,10 @@ toolbar .toolbarbutton-1 > .toolbarbutton-menubutton-dropmarker > .dropmarker-ic
     -moz-image-region: rect(18px, 342px, 36px, 324px);
   }
 
+  #e10s-button@toolbarButtonPressed@ {
+    -moz-image-region: rect(18px, 342px, 36px, 324px);
+  }
+
   #new-tab-button@toolbarButtonPressed@ {
     -moz-image-region: rect(18px, 360px, 36px, 342px);
   }
@@ -940,6 +949,18 @@ toolbar .toolbarbutton-1 > .toolbarbutton-menubutton-dropmarker > .dropmarker-ic
 
   #new-window-button[cui-areatype="toolbar"]:hover:active:not([disabled="true"]) {
     -moz-image-region: rect(36px, 684px, 72px, 648px);
+  }
+
+  #e10s-button[cui-areatype="toolbar"] {
+    -moz-image-region: rect(0, 684px, 36px, 648px);
+  }
+
+  #e10s-button[cui-areatype="toolbar"]:hover:active:not([disabled="true"]) {
+    -moz-image-region: rect(36px, 684px, 72px, 648px);
+  }
+
+  #e10s-button > .toolbarbutton-icon {
+    transform: scaleY(-1);
   }
 
   #new-tab-button[cui-areatype="toolbar"] {
@@ -1187,6 +1208,11 @@ toolbar .toolbarbutton-1 > .toolbarbutton-menubutton-dropmarker > .dropmarker-ic
 
   #new-window-button[cui-areatype="menu-panel"],
   toolbarpaletteitem[place="palette"] > #new-window-button {
+    -moz-image-region: rect(0px, 1024px, 64px, 960px);
+  }
+
+  #e10s-button[cui-areatype="menu-panel"],
+  toolbarpaletteitem[place="palette"] > #e10s-button {
     -moz-image-region: rect(0px, 1024px, 64px, 960px);
   }
 
@@ -2623,10 +2649,6 @@ sidebarheader {
   list-style-image: url("chrome://global/skin/icons/loading_16.png");
 }
 
-sidebarheader > .tabs-closebutton > .toolbarbutton-text {
-  display: none;
-}
-
 /* ----- CONTENT ----- */
 
 .browserContainer > findbar {
@@ -3179,18 +3201,6 @@ toolbarbutton.chevron > .toolbarbutton-menu-dropmarker {
   box-shadow: inset -5px 0 ThreeDShadow;
 }
 
-/* Tabstrip close button */
-.tabs-closebutton {
-  -moz-padding-end: 4px;
-  border: none;
-}
-
-@media (min-resolution: 2dppx) {
-  .tabs-closebutton > .toolbarbutton-icon {
-    width: 16px;
-  }
-}
-
 /* Bookmarks toolbar */
 #PlacesToolbarDropIndicator {
   list-style-image: url(chrome://browser/skin/places/toolbarDropMarker.png);
@@ -3374,7 +3384,7 @@ toolbarbutton.chevron > .toolbarbutton-menu-dropmarker {
   }
 }
 
-@conditionalForwardWithUrlbar@[forwarddisabled] > #urlbar > #notification-popup-box {
+@conditionalForwardWithUrlbar@ > #forward-button[disabled] + #urlbar > #notification-popup-box {
   padding-left: 7px;
 }
 
@@ -4304,6 +4314,12 @@ window > chatbox {
 #main-window[customize-entered] #customization-container,
 #main-window[customize-entered] #navigator-toolbox > toolbar:not(#TabsToolbar) {
   border-bottom-width: 0;
+}
+
+/* Compensate for the border set above for this horizontal line. */
+#main-window[customize-entered] #navigator-toolbox::after {
+  margin-left: 3px;
+  margin-right: 3px;
 }
 
 #main-window[customize-entered] #TabsToolbar {

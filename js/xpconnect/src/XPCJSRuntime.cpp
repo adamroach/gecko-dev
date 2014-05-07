@@ -408,7 +408,7 @@ static bool
 PrincipalImmuneToScriptPolicy(nsIPrincipal* aPrincipal)
 {
     // System principal gets a free pass.
-    if (XPCWrapper::GetSecurityManager()->IsSystemPrincipal(aPrincipal))
+    if (nsXPConnect::SecurityManager()->IsSystemPrincipal(aPrincipal))
         return true;
 
     // nsExpandedPrincipal gets a free pass.
@@ -449,12 +449,11 @@ Scriptability::Scriptability(JSCompartment *c) : mScriptBlocks(0)
     // If we're not immune, we should have a real principal with a codebase URI.
     // Check the URI against the new-style domain policy.
     if (!mImmuneToScriptPolicy) {
-        nsIScriptSecurityManager* ssm = XPCWrapper::GetSecurityManager();
         nsCOMPtr<nsIURI> codebase;
         nsresult rv = prin->GetURI(getter_AddRefs(codebase));
         bool policyAllows;
         if (NS_SUCCEEDED(rv) && codebase &&
-            NS_SUCCEEDED(ssm->PolicyAllowsScript(codebase, &policyAllows)))
+            NS_SUCCEEDED(nsXPConnect::SecurityManager()->PolicyAllowsScript(codebase, &policyAllows)))
         {
             mScriptBlockedByPolicy = !policyAllows;
         } else {
@@ -1258,7 +1257,7 @@ class WatchdogManager : public nsIObserver
     PRTime mTimestamps[TimestampCount];
 };
 
-NS_IMPL_ISUPPORTS1(WatchdogManager, nsIObserver)
+NS_IMPL_ISUPPORTS(WatchdogManager, nsIObserver)
 
 AutoLockWatchdog::AutoLockWatchdog(Watchdog *aWatchdog) : mWatchdog(aWatchdog)
 {
@@ -1740,7 +1739,7 @@ class JSMainRuntimeTemporaryPeakReporter MOZ_FINAL : public nsIMemoryReporter
     }
 };
 
-NS_IMPL_ISUPPORTS1(JSMainRuntimeTemporaryPeakReporter, nsIMemoryReporter)
+NS_IMPL_ISUPPORTS(JSMainRuntimeTemporaryPeakReporter, nsIMemoryReporter)
 
 // The REPORT* macros do an unconditional report.  The ZCREPORT* macros are for
 // compartments and zones; they aggregate any entries smaller than
@@ -2516,7 +2515,7 @@ class JSMainRuntimeCompartmentsReporter MOZ_FINAL : public nsIMemoryReporter
     }
 };
 
-NS_IMPL_ISUPPORTS1(JSMainRuntimeCompartmentsReporter, nsIMemoryReporter)
+NS_IMPL_ISUPPORTS(JSMainRuntimeCompartmentsReporter, nsIMemoryReporter)
 
 MOZ_DEFINE_MALLOC_SIZE_OF(OrphanMallocSizeOf)
 
@@ -2986,17 +2985,17 @@ ReadSourceFromFilename(JSContext *cx, const char *filename, jschar **src, size_t
         ptr += bytesRead;
     }
 
-    nsString decoded;
     rv = nsScriptLoader::ConvertToUTF16(scriptChannel, buf, rawLen, EmptyString(),
-                                        nullptr, decoded);
+                                        nullptr, *src, *len);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    // Copy to JS engine.
-    *len = decoded.Length();
-    *src = static_cast<jschar *>(JS_malloc(cx, decoded.Length()*sizeof(jschar)));
     if (!*src)
         return NS_ERROR_FAILURE;
-    memcpy(*src, decoded.get(), decoded.Length()*sizeof(jschar));
+
+    // Historically this method used JS_malloc() which updates the GC memory
+    // accounting.  Since ConvertToUTF16() now uses js_malloc() instead we
+    // update the accounting manually after the fact.
+    JS_updateMallocCounter(cx, *len);
 
     return NS_OK;
 }

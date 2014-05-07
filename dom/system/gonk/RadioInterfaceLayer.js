@@ -1632,7 +1632,9 @@ WorkerMessenger.prototype = {
         sendStkProfileDownload:
           libcutils.property_get("ro.moz.ril.send_stk_profile_dl", "false") == "true",
         dataRegistrationOnDemand:
-          libcutils.property_get("ro.moz.ril.data_reg_on_demand", "false") == "true"
+          libcutils.property_get("ro.moz.ril.data_reg_on_demand", "false") == "true",
+        subscriptionControl:
+          libcutils.property_get("ro.moz.ril.subscription_control", "false") == "true"
       },
       rilEmergencyNumbers: libcutils.property_get("ril.ecclist") ||
                            libcutils.property_get("ro.ril.ecclist")
@@ -3489,6 +3491,11 @@ RadioInterface.prototype = {
                                                 this.clientId, message);
   },
 
+  _sendClirModeChanged: function(message) {
+    gMessageManager.sendMobileConnectionMessage("RIL:ClirModeChanged",
+                                                this.clientId, message);
+  },
+
   _updateCallingLineIdRestrictionPref: function(mode) {
     try {
       Services.prefs.setIntPref(kPrefClirModePreference, mode);
@@ -3505,6 +3512,7 @@ RadioInterface.prototype = {
       if (response.isSetCallForward) {
         this._sendCfStateChanged(response);
       } else if (response.isSetCLIR && response.success) {
+        this._sendClirModeChanged(response.clirMode);
         this._updateCallingLineIdRestrictionPref(response.clirMode);
       }
 
@@ -3535,6 +3543,7 @@ RadioInterface.prototype = {
     }
     this.workerMessenger.send("setCLIR", message, (function(response) {
       if (response.success) {
+        this._sendClirModeChanged(response.clirMode);
         this._updateCallingLineIdRestrictionPref(response.clirMode);
       }
       target.sendAsyncMessage("RIL:SetCallingLineIdRestriction", {

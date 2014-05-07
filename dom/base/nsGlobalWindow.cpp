@@ -172,7 +172,7 @@
 
 #include "nsIDragService.h"
 #include "mozilla/dom/Element.h"
-#include "mozilla/Selection.h"
+#include "mozilla/dom/Selection.h"
 #include "nsFrameLoader.h"
 #include "nsISupportsPrimitives.h"
 #include "nsXPCOMCID.h"
@@ -502,7 +502,7 @@ private:
   nsGlobalWindow* mWindow;
 };
 
-NS_IMPL_ISUPPORTS2(nsGlobalWindowObserver, nsIObserver, nsIInterfaceRequestor)
+NS_IMPL_ISUPPORTS(nsGlobalWindowObserver, nsIObserver, nsIInterfaceRequestor)
 
 nsTimeout::nsTimeout()
   : mCleared(false),
@@ -581,7 +581,7 @@ nsPIDOMWindow::nsPIDOMWindow(nsPIDOMWindow *aOuterWindow)
 nsPIDOMWindow::~nsPIDOMWindow() {}
 
 // DialogValueHolder CC goop.
-NS_IMPL_CYCLE_COLLECTION_1(DialogValueHolder, mValue)
+NS_IMPL_CYCLE_COLLECTION(DialogValueHolder, mValue)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(DialogValueHolder)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
@@ -615,13 +615,11 @@ public:
   virtual bool getPropertyDescriptor(JSContext* cx,
                                      JS::Handle<JSObject*> proxy,
                                      JS::Handle<jsid> id,
-                                     JS::MutableHandle<JSPropertyDescriptor> desc,
-                                     unsigned flags) MOZ_OVERRIDE;
+                                     JS::MutableHandle<JSPropertyDescriptor> desc) MOZ_OVERRIDE;
   virtual bool getOwnPropertyDescriptor(JSContext* cx,
                                         JS::Handle<JSObject*> proxy,
                                         JS::Handle<jsid> id,
-                                        JS::MutableHandle<JSPropertyDescriptor> desc,
-                                        unsigned flags) MOZ_OVERRIDE;
+                                        JS::MutableHandle<JSPropertyDescriptor> desc) MOZ_OVERRIDE;
   virtual bool defineProperty(JSContext* cx,
                               JS::Handle<JSObject*> proxy,
                               JS::Handle<jsid> id,
@@ -748,14 +746,13 @@ bool
 nsOuterWindowProxy::getPropertyDescriptor(JSContext* cx,
                                           JS::Handle<JSObject*> proxy,
                                           JS::Handle<jsid> id,
-                                          JS::MutableHandle<JSPropertyDescriptor> desc,
-                                          unsigned flags)
+                                          JS::MutableHandle<JSPropertyDescriptor> desc)
 {
   // The only thing we can do differently from js::Wrapper is shadow stuff with
   // our indexed properties, so we can just try getOwnPropertyDescriptor and if
   // that gives us nothing call on through to js::Wrapper.
   desc.object().set(nullptr);
-  if (!getOwnPropertyDescriptor(cx, proxy, id, desc, flags)) {
+  if (!getOwnPropertyDescriptor(cx, proxy, id, desc)) {
     return false;
   }
 
@@ -763,15 +760,14 @@ nsOuterWindowProxy::getPropertyDescriptor(JSContext* cx,
     return true;
   }
 
-  return js::Wrapper::getPropertyDescriptor(cx, proxy, id, desc, flags);
+  return js::Wrapper::getPropertyDescriptor(cx, proxy, id, desc);
 }
 
 bool
 nsOuterWindowProxy::getOwnPropertyDescriptor(JSContext* cx,
                                              JS::Handle<JSObject*> proxy,
                                              JS::Handle<jsid> id,
-                                             JS::MutableHandle<JSPropertyDescriptor> desc,
-                                             unsigned flags)
+                                             JS::MutableHandle<JSPropertyDescriptor> desc)
 {
   bool found;
   if (!GetSubframeWindow(cx, proxy, id, desc.value(), found)) {
@@ -783,7 +779,7 @@ nsOuterWindowProxy::getOwnPropertyDescriptor(JSContext* cx,
   }
   // else fall through to js::Wrapper
 
-  return js::Wrapper::getOwnPropertyDescriptor(cx, proxy, id, desc, flags);
+  return js::Wrapper::getOwnPropertyDescriptor(cx, proxy, id, desc);
 }
 
 bool
@@ -1607,6 +1603,8 @@ nsGlobalWindow::FreeInnerObjects()
   mAudioContexts.Clear();
 
 #ifdef MOZ_GAMEPAD
+  DisableGamepadUpdates();
+  mHasGamepad = false;
   mGamepads.Clear();
 #endif
 }
@@ -2016,9 +2014,6 @@ nsGlobalWindow::SetInitialPrincipalToSubject()
 
   // First, grab the subject principal.
   nsCOMPtr<nsIPrincipal> newWindowPrincipal = nsContentUtils::GetSubjectPrincipal();
-  if (!newWindowPrincipal) {
-    newWindowPrincipal = nsContentUtils::GetSystemPrincipal();
-  }
 
   // Now, if we're about to use the system principal or an nsExpandedPrincipal,
   // make sure we're not using it for a content docshell.
@@ -2156,7 +2151,7 @@ WindowStateHolder::~WindowStateHolder()
   }
 }
 
-NS_IMPL_ISUPPORTS1(WindowStateHolder, WindowStateHolder)
+NS_IMPL_ISUPPORTS(WindowStateHolder, WindowStateHolder)
 
 // We need certain special behavior for remote XUL whitelisted domains, but we
 // don't want that behavior to take effect in automation, because we whitelist
@@ -6057,52 +6052,41 @@ nsGlobalWindow::MakeScriptDialogTitle(nsAString &aOutTitle)
   // Try to get a host from the running principal -- this will do the
   // right thing for javascript: and data: documents.
 
-  nsresult rv = NS_OK;
-  NS_ASSERTION(nsContentUtils::GetSecurityManager(),
-    "Global Window has no security manager!");
-  if (nsContentUtils::GetSecurityManager()) {
-    nsCOMPtr<nsIPrincipal> principal;
-    rv = nsContentUtils::GetSecurityManager()->
-      GetSubjectPrincipal(getter_AddRefs(principal));
+  nsCOMPtr<nsIPrincipal> principal = nsContentUtils::GetSubjectPrincipal();
+  nsCOMPtr<nsIURI> uri;
+  nsresult rv = principal->GetURI(getter_AddRefs(uri));
+  // Note - The check for the current JSContext here isn't necessarily sensical.
+  // It's just designed to preserve existing behavior during a mass-conversion
+  // patch.
+  if (NS_SUCCEEDED(rv) && uri && nsContentUtils::GetCurrentJSContext()) {
+    // remove user:pass for privacy and spoof prevention
 
-    if (NS_SUCCEEDED(rv) && principal) {
-      nsCOMPtr<nsIURI> uri;
-      rv = principal->GetURI(getter_AddRefs(uri));
+    nsCOMPtr<nsIURIFixup> fixup(do_GetService(NS_URIFIXUP_CONTRACTID));
+    if (fixup) {
+      nsCOMPtr<nsIURI> fixedURI;
+      rv = fixup->CreateExposableURI(uri, getter_AddRefs(fixedURI));
+      if (NS_SUCCEEDED(rv) && fixedURI) {
+        nsAutoCString host;
+        fixedURI->GetHost(host);
 
-      if (NS_SUCCEEDED(rv) && uri) {
-        // remove user:pass for privacy and spoof prevention
+        if (!host.IsEmpty()) {
+          // if this URI has a host we'll show it. For other
+          // schemes (e.g. file:) we fall back to the localized
+          // generic string
 
-        nsCOMPtr<nsIURIFixup> fixup(do_GetService(NS_URIFIXUP_CONTRACTID));
-        if (fixup) {
-          nsCOMPtr<nsIURI> fixedURI;
-          rv = fixup->CreateExposableURI(uri, getter_AddRefs(fixedURI));
-          if (NS_SUCCEEDED(rv) && fixedURI) {
-            nsAutoCString host;
-            fixedURI->GetHost(host);
+          nsAutoCString prepath;
+          fixedURI->GetPrePath(prepath);
 
-            if (!host.IsEmpty()) {
-              // if this URI has a host we'll show it. For other
-              // schemes (e.g. file:) we fall back to the localized
-              // generic string
-
-              nsAutoCString prepath;
-              fixedURI->GetPrePath(prepath);
-
-              NS_ConvertUTF8toUTF16 ucsPrePath(prepath);
-              const char16_t *formatStrings[] = { ucsPrePath.get() };
-              nsXPIDLString tempString;
-              nsContentUtils::FormatLocalizedString(nsContentUtils::eCOMMON_DIALOG_PROPERTIES,
-                                                    "ScriptDlgHeading",
-                                                    formatStrings,
-                                                    tempString);
-              aOutTitle = tempString;
-            }
-          }
+          NS_ConvertUTF8toUTF16 ucsPrePath(prepath);
+          const char16_t *formatStrings[] = { ucsPrePath.get() };
+          nsXPIDLString tempString;
+          nsContentUtils::FormatLocalizedString(nsContentUtils::eCOMMON_DIALOG_PROPERTIES,
+                                                "ScriptDlgHeading",
+                                                formatStrings,
+                                                tempString);
+          aOutTitle = tempString;
         }
       }
-    }
-    else { // failed to get subject principal
-      NS_WARNING("No script principal? Who is calling alert/confirm/prompt?!");
     }
   }
 
@@ -11695,28 +11679,14 @@ nsGlobalWindow::SetTimeoutOrInterval(nsIScriptTimeoutHandler *aHandler,
   // If our principals subsume the subject principal then use the subject
   // principal. Otherwise, use our principal to avoid running script in
   // elevated principals.
-
-  nsCOMPtr<nsIPrincipal> subjectPrincipal;
-  nsresult rv;
-  rv = nsContentUtils::GetSecurityManager()->
-    GetSubjectPrincipal(getter_AddRefs(subjectPrincipal));
-  if (NS_FAILED(rv)) {
-    return NS_ERROR_FAILURE;
-  }
-
-  bool subsumes = false;
-  nsCOMPtr<nsIPrincipal> ourPrincipal = GetPrincipal();
-
+  //
   // Note the direction of this test: We don't allow setTimeouts running with
   // chrome privileges on content windows, but we do allow setTimeouts running
   // with content privileges on chrome windows (where they can't do very much,
   // of course).
-  rv = ourPrincipal->Subsumes(subjectPrincipal, &subsumes);
-  if (NS_FAILED(rv)) {
-    return NS_ERROR_FAILURE;
-  }
-
-  if (subsumes) {
+  nsCOMPtr<nsIPrincipal> subjectPrincipal = nsContentUtils::GetSubjectPrincipal();
+  nsCOMPtr<nsIPrincipal> ourPrincipal = GetPrincipal();
+  if (ourPrincipal->Subsumes(subjectPrincipal)) {
     timeout->mPrincipal = subjectPrincipal;
   } else {
     timeout->mPrincipal = ourPrincipal;
@@ -11732,6 +11702,7 @@ nsGlobalWindow::SetTimeoutOrInterval(nsIScriptTimeoutHandler *aHandler,
 
     timeout->mWhen = TimeStamp::Now() + delta;
 
+    nsresult rv;
     timeout->mTimer = do_CreateInstance("@mozilla.org/timer;1", &rv);
     if (NS_FAILED(rv)) {
       return rv;
@@ -13655,7 +13626,7 @@ nsGlobalWindow::EnableNetworkEvent(uint32_t aType)
   MOZ_ASSERT(IsInnerWindow());
 
   nsCOMPtr<nsIPermissionManager> permMgr =
-    do_GetService(NS_PERMISSIONMANAGER_CONTRACTID);
+    services::GetPermissionManager();
   if (!permMgr) {
     NS_ERROR("No PermissionManager available!");
     return;
