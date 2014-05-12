@@ -10,8 +10,25 @@ function promiseOpenChat(url, mode, focus) {
   let uri = Services.io.newURI(url, null, null);
   let origin = uri.prePath;
   let title = origin;
-  let chatbox = Chat.open(null, origin, title, url, mode, focus);
-  return chatbox.promiseChatLoaded;
+  let deferred = Promise.defer();
+  // we just through a few hoops to ensure the content document is fully
+  // loaded, otherwise tests that rely on that content may intermittently fail.
+  let callback = function(chatbox) {
+    if (chatbox.contentDocument.readyState == "complete") {
+      // already loaded.
+      deferred.resolve(chatbox);
+      return;
+    }
+    chatbox.addEventListener("load", function onload(event) {
+      if (event.target != chatbox.contentDocument || chatbox.contentDocument.location.href == "about:blank") {
+        return;
+      }
+      chatbox.removeEventListener("load", onload, true);
+      deferred.resolve(chatbox);
+    }, true);
+  }
+  let chatbox = Chat.open(null, origin, title, url, mode, focus, callback);
+  return deferred.promise;
 }
 
 // Opens a chat, returns a promise resolved when the chat callback fired.

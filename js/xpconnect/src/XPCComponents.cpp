@@ -26,6 +26,8 @@
 #include "nsIDOMFile.h"
 #include "nsIDOMFileList.h"
 #include "nsWindowMemoryReporter.h"
+#include "nsDOMClassInfo.h"
+#include "ShimInterfaceInfo.h"
 
 using namespace mozilla;
 using namespace JS;
@@ -303,9 +305,12 @@ nsXPCComponents_Interfaces::NewResolve(nsIXPConnectWrappedNative *wrapper,
 
     // we only allow interfaces by name here
     if (name.encodeLatin1(cx, str) && name.ptr()[0] != '{') {
-        nsCOMPtr<nsIInterfaceInfo> info;
-        XPTInterfaceInfoManager::GetSingleton()->
-            GetInfoForName(name.ptr(), getter_AddRefs(info));
+        nsCOMPtr<nsIInterfaceInfo> info =
+            ShimInterfaceInfo::MaybeConstruct(name.ptr(), cx);
+        if (!info) {
+            XPTInterfaceInfoManager::GetSingleton()->
+                GetInfoForName(name.ptr(), getter_AddRefs(info));
+        }
         if (!info)
             return NS_OK;
 
@@ -2926,7 +2931,7 @@ nsXPCComponents_Utils::GetGlobalForObject(HandleValue object,
         return NS_ERROR_FAILURE;
 
     // Outerize if necessary.
-    if (JSObjectOp outerize = js::GetObjectClass(obj)->ext.outerObject)
+    if (js::ObjectOp outerize = js::GetObjectClass(obj)->ext.outerObject)
       obj = outerize(cx, obj);
 
     retval.setObject(*obj);

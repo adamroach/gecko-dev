@@ -166,7 +166,10 @@ add_chat_task(function* testTab() {
         clearInterval(interval);
         deferred.resolve();
       }
-    });
+      info("retrying wait for focus: " + tries);
+      info("(the active element is " + doc.activeElement + "/" + doc.activeElement.getAttribute("id") + ")");
+    }, 100);
+    info("waiting for element " + eltid + " to get focus");
     return deferred.promise;
   }
 
@@ -175,6 +178,7 @@ add_chat_task(function* testTab() {
   chatbar.selectedChat = chat2;
   let promise = promiseOneEvent(chat2.contentWindow, "focus");
   chatbar.focus();
+  info("waiting for second chat to get focus");
   yield promise;
 
   // Our chats have 3 focusable elements, so it takes 4 TABs to move

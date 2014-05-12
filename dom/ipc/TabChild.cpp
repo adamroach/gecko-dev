@@ -1331,6 +1331,23 @@ TabChild::DestroyWindow()
       }
       mLayersId = 0;
     }
+
+    for (uint32_t index = 0, count = mCachedFileDescriptorInfos.Length();
+         index < count;
+         index++) {
+        nsAutoPtr<CachedFileDescriptorInfo>& info =
+            mCachedFileDescriptorInfos[index];
+
+        MOZ_ASSERT(!info->mCallback);
+
+        if (info->mFileDescriptor.IsValid()) {
+            MOZ_ASSERT(!info->mCanceled);
+
+            nsRefPtr<CloseFileRunnable> runnable =
+                new CloseFileRunnable(info->mFileDescriptor);
+            runnable->Dispatch();
+        }
+    }
 }
 
 bool
@@ -1438,7 +1455,7 @@ TabChild::RecvCacheFileDescriptor(const nsString& aPath,
 
     // First see if we already have a request for this path.
     const CachedFileDescriptorInfo search(aPath);
-    uint32_t index =
+    size_t index =
         mCachedFileDescriptorInfos.IndexOf(search, 0,
                                            search.PathOnlyComparator());
     if (index == mCachedFileDescriptorInfos.NoIndex) {
@@ -1490,7 +1507,7 @@ TabChild::GetCachedFileDescriptor(const nsAString& aPath,
     // First see if we've already received a cached file descriptor for this
     // path.
     const CachedFileDescriptorInfo search(aPath);
-    uint32_t index =
+    size_t index =
         mCachedFileDescriptorInfos.IndexOf(search, 0,
                                            search.PathOnlyComparator());
     if (index == mCachedFileDescriptorInfos.NoIndex) {
@@ -1546,7 +1563,7 @@ TabChild::CancelCachedFileDescriptorCallback(
     }
 
     const CachedFileDescriptorInfo search(aPath, aCallback);
-    uint32_t index =
+    size_t index =
         mCachedFileDescriptorInfos.IndexOf(search, 0,
                                            search.PathAndCallbackComparator());
     if (index == mCachedFileDescriptorInfos.NoIndex) {
@@ -1562,6 +1579,9 @@ TabChild::CancelCachedFileDescriptorCallback(
     MOZ_ASSERT(!info->mFileDescriptor.IsValid());
     MOZ_ASSERT(info->mCallback == aCallback);
     MOZ_ASSERT(!info->mCanceled);
+
+    // No need to hold the callback any longer.
+    info->mCallback = nullptr;
 
     // Set this flag so that we will close the file descriptor when it arrives.
     info->mCanceled = true;
@@ -2359,7 +2379,10 @@ TabChild::RecvSetIsDocShellActive(const bool& aIsActive)
 }
 
 PRenderFrameChild*
-TabChild::AllocPRenderFrameChild()
+TabChild::AllocPRenderFrameChild(ScrollingBehavior* aScrolling,
+                                 TextureFactoryIdentifier* aTextureFactoryIdentifier,
+                                 uint64_t* aLayersId,
+                                 bool* aSuccess)
 {
     return new RenderFrameChild();
 }
@@ -2418,12 +2441,14 @@ TabChild::InitRenderingState()
     uint64_t id;
     bool success;
     RenderFrameChild* remoteFrame =
-        static_cast<RenderFrameChild*>(SendPRenderFrameConstructor());
+        static_cast<RenderFrameChild*>(SendPRenderFrameConstructor(
+                                         &mScrolling,
+                                         &mTextureFactoryIdentifier, &id,
+                                         &success));
     if (!remoteFrame) {
         NS_WARNING("failed to construct RenderFrame");
         return false;
     }
-    SendInitRenderFrame(remoteFrame, &mScrolling, &mTextureFactoryIdentifier, &id, &success);
     if (!success) {
         NS_WARNING("failed to construct RenderFrame");
         PRenderFrameChild::Send__delete__(remoteFrame);
