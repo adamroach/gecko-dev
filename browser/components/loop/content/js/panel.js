@@ -19,6 +19,37 @@ loop.panel = (function(_, mozL10n) {
   var router;
 
   /**
+   * Do not disturb panel subview.
+   */
+  var DoNotDisturbView = sharedViews.BaseView.extend({
+    template: _.template([
+      '<label>',
+      '  <input type="checkbox" <%- checked %>>',
+      '  <span data-l10n-id="do_not_disturb"></span>',
+      '</label>',
+    ].join('')),
+
+    events: {
+      "click input[type=checkbox]": "toggle"
+    },
+
+    /**
+     * Toggles mozLoop activation status.
+     */
+    toggle: function() {
+      navigator.mozLoop.doNotDisturb = !navigator.mozLoop.doNotDisturb;
+      this.render();
+    },
+
+    render: function() {
+      this.$el.html(this.template({
+        checked: navigator.mozLoop.doNotDisturb ? "checked" : ""
+      }));
+      return this;
+    }
+  });
+
+  /**
    * Panel view.
    */
   var PanelView = sharedViews.BaseView.extend({
@@ -27,15 +58,16 @@ loop.panel = (function(_, mozL10n) {
       '  <p data-l10n-id="get_link_to_share"></p>',
       '</div>',
       '<div class="action">',
-      '  <p class="invite">',
-      '    <input type="text" name="caller" data-l10n-id="caller">',
-      '    <button class="get-url btn btn-success disabled" href=""',
+      '  <form class="invite">',
+      '    <input type="text" name="caller" data-l10n-id="caller" required>',
+      '    <button type="submit" class="get-url btn btn-success"',
       '       data-l10n-id="get_a_call_url"></button>',
-      '  </p>',
+      '  </form>',
       '  <p class="result hide">',
       '    <input id="call-url" type="url" readonly>',
       '    <a class="go-back btn btn-info" href="" data-l10n-id="new_url"></a>',
       '  </p>',
+      '  <p class="dnd"></p>',
       '</div>',
     ].join("")),
 
@@ -43,7 +75,7 @@ loop.panel = (function(_, mozL10n) {
 
     events: {
       "keyup input[name=caller]": "changeButtonState",
-      "click .get-url": "getCallUrl",
+      "submit form.invite": "getCallUrl",
       "click a.go-back": "goBack"
     },
 
@@ -54,7 +86,7 @@ loop.panel = (function(_, mozL10n) {
       }
       this.notifier = options.notifier;
       this.client = new loop.shared.Client({
-        baseServerUrl: window.navigator.mozLoop.serverUrl
+        baseServerUrl: navigator.mozLoop.serverUrl
       });
     },
 
@@ -67,6 +99,7 @@ loop.panel = (function(_, mozL10n) {
       var callback = function(err, callUrl) {
         if (err) {
           this.notifier.errorL10n("unable_retrieve_url");
+          this.render();
           return;
         }
         this.onCallUrlReceived(callUrl);
@@ -80,6 +113,8 @@ loop.panel = (function(_, mozL10n) {
       this.$(".action .result").hide();
       this.$(".action .invite").show();
       this.$(".description p").text(__("get_link_to_share"));
+      this.unsetPending();
+      this.$("[name=caller]").focus();
     },
 
     onCallUrlReceived: function(callUrl) {
@@ -89,20 +124,40 @@ loop.panel = (function(_, mozL10n) {
       this.$(".action .result input").val(callUrl);
       this.$(".action .result").show();
       this.$(".description p").text(__("share_link_url"));
+      this.unsetPending();
+    },
+
+    disableGetUrlButton: function() {
+      this.$(".get-url").attr("disabled", "disabled");
+    },
+
+    enableGetUrlButton: function() {
+      this.$(".get-url").removeAttr("disabled");
     },
 
     setPending: function() {
       this.$("[name=caller]").addClass("pending");
-      this.$(".get-url").addClass("disabled").attr("disabled", "disabled");
+      this.disableGetUrlButton();
+    },
+
+    unsetPending: function() {
+      this.$("[name=caller]").removeClass("pending");
+      this.enableGetUrlButton();
     },
 
     changeButtonState: function() {
-      var enabled = !!this.$("input[name=caller]").val();
-      if (enabled) {
-        this.$(".get-url").removeClass("disabled");
+      if (!!this.$("input[name=caller]").val().trim()) {
+        this.enableGetUrlButton();
       } else {
-        this.$(".get-url").addClass("disabled");
+        this.disableGetUrlButton();
       }
+    },
+
+    render: function() {
+      this.$el.html(this.template());
+      // Do not Disturb sub view
+      new DoNotDisturbView({el: this.$(".dnd")}).render();
+      return this;
     }
   });
 
@@ -169,7 +224,7 @@ loop.panel = (function(_, mozL10n) {
   function init() {
     // Do the initial L10n setup, we do this before anything
     // else to ensure the L10n environment is setup correctly.
-    mozL10n.initialize(window.navigator.mozLoop);
+    mozL10n.initialize(navigator.mozLoop);
 
     router = new PanelRouter({
       document: document,
@@ -186,6 +241,7 @@ loop.panel = (function(_, mozL10n) {
   return {
     init: init,
     PanelView: PanelView,
+    DoNotDisturbView: DoNotDisturbView,
     PanelRouter: PanelRouter
   };
 })(_, document.mozL10n);
