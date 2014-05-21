@@ -86,8 +86,16 @@ function injectLoopAPI(targetWindow) {
       value: function(key) {
         return MozLoopService.getStrings(key);
       }
-    }
+    },
 
+    getCharPref: {
+      enumerable: true,
+      configurable: true,
+      writeable: true,
+      value: function(pref) {
+        return Services.prefs.getCharPref(pref);
+      }
+    }
   };
 
   let contentObj = Cu.createObjectIn(targetWindow);

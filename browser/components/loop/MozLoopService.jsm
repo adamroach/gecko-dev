@@ -186,13 +186,6 @@ let MozLoopServiceInternal = {
                           true);
     this.registerXhr.setRequestHeader('Content-Type', 'application/json');
 
-    // XXX maybe do something less hacky here?  It's not yet obvious to me
-    // why mozIThirdPartyUtils is labeling this cookie as foreign; going over
-    // the IDL in detail may be enough to figure that.  For now, let's unblock
-    // work.
-    this.registerXhr.channel.QueryInterface(Ci.nsIHttpChannelInternal);
-    this.registerXhr.channel.forceAllowThirdPartyCookie = true;
-
     this.registerXhr.channel.loadFlags = Ci.nsIChannel.INHIBIT_CACHING
       | Ci.nsIChannel.LOAD_BYPASS_CACHE
       | Ci.nsIChannel.LOAD_EXPLICIT_CREDENTIALS;
@@ -218,15 +211,42 @@ let MozLoopServiceInternal = {
    * Callback from the registation xhr. Checks the registration result.
    */
   onRegistrationResult: function() {
+    // XXX Bubble the errors up to the UI somehow, bug 994151 will handle
+    // some of this
+
     if (this.registerXhr.readyState != Ci.nsIXMLHttpRequest.DONE)
       return;
 
     if (this.registerXhr.status != 200) {
-      // XXX Bubble this up to the UI somehow, bug 994151 will handle some of this
       Cu.reportError("Failed to register with the loop server. Code: " +
         this.registerXhr.status + " Text: " + this.registerXhr.statusText);
       return;
     }
+
+    // XXX do we care that we're redoing this even if we've already got these
+    // prefs
+    // XXX better error handling
+    let identifier = this.registerXhr.getResponseHeader("Hawk-Identifier");
+    if (!identifier) {
+      Cu.reportError("Hawk-Identifier not set in registration response");
+      return;
+    }
+
+    let key = this.registerXhr.getResponseHeader("Hawk-Key");
+    if (!key) {
+      Cu.reportError("Hawk-Key not set in registration response");
+      return;
+    }
+
+    let algorithm = this.registerXhr.getResponseHeader("Hawk-Algorithm");
+    if (!algorithm) {
+      Cu.reportError("Hawk-Key not set in registration response");
+      return;
+    }
+
+    Services.prefs.setCharPref("loop.hawk-identifier", identifier);
+    Services.prefs.setCharPref("loop.hawk-key", key);
+    Services.prefs.setCharPref("loop.hawk-algorithm", algorithm);
 
     // Otherwise we registered just fine.
     // XXX For now, we'll just save this fact, bug 994151 (again) will make use of
