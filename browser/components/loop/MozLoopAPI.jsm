@@ -104,6 +104,17 @@ function injectLoopAPI(targetWindow) {
       value: function(expiryTimeSeconds) {
         MozLoopService.noteCallUrlExpiry(expiryTimeSeconds);
       }
+    },
+
+    getCharPref: {
+      enumerable: true,
+      configurable: true,
+      writeable: true,
+      value: function(pref) {
+        // XXX This should be restricted to either just the token pref,
+        // or the loop.* prefs (consider serverUrl)
+        return Services.prefs.getCharPref(pref);
+      }
     }
   };
 
