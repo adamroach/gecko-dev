@@ -226,27 +226,13 @@ let MozLoopServiceInternal = {
     // XXX do we care that we're redoing this even if we've already got these
     // prefs
     // XXX better error handling
-    let identifier = this.registerXhr.getResponseHeader("Hawk-Identifier");
-    if (!identifier) {
-      Cu.reportError("Hawk-Identifier not set in registration response");
+    let sessionToken = this.registerXhr.getResponseHeader("Hawk-Session-Token");
+    if (!sessionToken) {
+      Cu.reportError("Hawk-Session-Token not set in registration response");
       return;
     }
 
-    let key = this.registerXhr.getResponseHeader("Hawk-Key");
-    if (!key) {
-      Cu.reportError("Hawk-Key not set in registration response");
-      return;
-    }
-
-    let algorithm = this.registerXhr.getResponseHeader("Hawk-Algorithm");
-    if (!algorithm) {
-      Cu.reportError("Hawk-Key not set in registration response");
-      return;
-    }
-
-    Services.prefs.setCharPref("loop.hawk-identifier", identifier);
-    Services.prefs.setCharPref("loop.hawk-key", key);
-    Services.prefs.setCharPref("loop.hawk-algorithm", algorithm);
+    Services.prefs.setCharPref("loop.hawk-session-token", sessionToken);
 
     // Otherwise we registered just fine.
     // XXX For now, we'll just save this fact, bug 994151 (again) will make use of
