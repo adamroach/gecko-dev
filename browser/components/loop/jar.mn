@@ -25,6 +25,7 @@ browser.jar:
   content/browser/loop/libs/l10n.js                  (content/libs/l10n.js)
   content/browser/loop/js/desktopRouter.js           (content/js/desktopRouter.js)
   content/browser/loop/js/conversation.js            (content/js/conversation.js)
+  content/browser/loop/js/contacts.js                (content/js/contacts.js)
   content/browser/loop/js/panel.js                   (content/js/panel.js)
   # Partner SDK assets
   content/browser/loop/libs/sdk.js                                             (content/libs/sdk.js)
