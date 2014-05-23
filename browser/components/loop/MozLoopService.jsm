@@ -328,13 +328,18 @@ let MozLoopServiceInternal = {
   },
 
   /**
-   * Callback from the registation xhr. Checks the registration result.
+   * Callback from the registration xhr. Checks the registration result.
    */
   onLoopRegistered: function() {
     if (this.loopXhr.readyState != Ci.nsIXMLHttpRequest.DONE)
       return;
 
     let status = this.loopXhr.status;
+
+    let sessionToken = this.loopXhr.getResponseHeader("Hawk-Session-Token");
+    if (sessionToken) {
+      Services.prefs.setCharPref("loop.hawk-session-token", sessionToken);
+    }
 
     if (status != 200) {
       // XXX Bubble the precise details up to the UI somehow (bug 1013248).
