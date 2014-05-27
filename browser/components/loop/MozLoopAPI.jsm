@@ -127,7 +127,7 @@ function injectLoopAPI(targetWindow) {
       configurable: true,
       writable: true,
       value: function(prefName) {
-        MozLoopService.getLoopCharPref(prefName);
+        return MozLoopService.getLoopCharPref(prefName);
       }
     }
   };
