@@ -98,6 +98,11 @@ loop.panel = (function(_, mozL10n) {
     },
 
     render: function() {
+      var mailto = [
+        "mailto:?subject=" + __("share_email_subject") + "&",
+        "body=" + __("share_email_body", {callUrl: this.props.callUrl})
+      ].join("");
+
       // XXX setting elem value from a state (in the callUrl input)
       // makes it immutable ie read only but that is fine in our case.
       // readOnly attr will suppress a warning regarding this issue
@@ -107,7 +112,8 @@ loop.panel = (function(_, mozL10n) {
           React.DOM.div( {className:"invite"}, 
             React.DOM.input( {type:"url", value:this.props.callUrl, readOnly:"true"} ),
             React.DOM.button( {onClick:this.handleButtonClick,
-                    className:"btn btn-success"}, __("new_url"))
+                    className:"btn btn-success"}, __("new_url")),
+            React.DOM.a( {className:"btn btn-success", href:mailto}, __("share_button"))
           )
         )
       );
